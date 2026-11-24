@@ -46,6 +46,7 @@ addopts = "-ra"
 markers = [
     "integration: pruebas que levantan Qt u otros componentes reales",
     "realgame: pruebas con juegos reales; requieren variables PTL_*_PATH",
+    "wine: pruebas con Wine real; se omiten si no está instalado",
 ]
 
 [tool.ruff]
