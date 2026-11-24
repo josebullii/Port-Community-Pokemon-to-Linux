@@ -176,3 +176,55 @@ def test_stop_game_use_case(qapp, tmp_path):
 
     assert process.wait(10_000)
     assert process.outcome.state is ProcessState.STOPPED
+
+
+# --- Logs, errores y estados poco frecuentes ------------------------------------
+
+
+def test_logs_are_unique_and_pruned(qapp, tmp_path):
+    logs = tmp_path / "logs"
+    for _ in range(4):  # varios lanzamientos en el mismo segundo
+        run(GameProcess(spec(tmp_path, "pass"), log_dir=logs, max_logs=3))
+
+    files = sorted((logs / "games" / "juego").glob("*.log"))
+    assert len(files) == 3  # solo se conservan los 3 más recientes
+    assert len({f.name for f in files}) == 3
+
+
+def test_unwritable_log_dir_does_not_prevent_launch(qapp, tmp_path):
+    blocker = tmp_path / "no-es-carpeta"
+    blocker.write_text("un fichero donde debería ir la carpeta de logs")
+    process = GameProcess(spec(tmp_path, "print('sigo funcionando')"), log_dir=blocker)
+
+    assert run(process) == ["sigo funcionando"]
+    assert process.outcome.state is ProcessState.FINISHED
+    assert process.outcome.log_file is None
+
+
+def test_failing_stop_command_falls_back_to_kill(qapp, tmp_path):
+    bad_stop = (str(tmp_path / "no-existe-wineserver"), "-k")
+    process = GameProcess(
+        spec(tmp_path, "import time; time.sleep(60)", stop_command=bad_stop), stop_grace_ms=300
+    )
+    process.start()
+    assert process._process.waitForStarted(10_000)
+    assert process.pid is not None
+
+    process.stop()
+    assert process.wait(10_000)
+    assert process.outcome.state is ProcessState.STOPPED
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="señales POSIX")
+def test_crash_is_reported(qapp, tmp_path):
+    process = GameProcess(spec(tmp_path, "import os, signal; os.kill(os.getpid(), signal.SIGKILL)"))
+    run(process)
+
+    assert process.outcome.state is ProcessState.CRASHED
+    assert process.outcome.exit_code is None
+
+
+def test_wait_before_start(qapp, tmp_path):
+    process = GameProcess(spec(tmp_path, "pass"))
+    assert process.wait(100) is False
+    assert process.pid is None

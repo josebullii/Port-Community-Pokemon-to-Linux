@@ -25,6 +25,29 @@ from pokemon_to_linux.infrastructure.wine.wine_manager import WineError, run_com
 
 log = get_logger(__name__)
 
+MAX_GAME_LOGS = 20
+"""Logs por lanzamiento que se conservan de cada juego (los más antiguos se borran)."""
+
+
+def _new_log_path(folder: Path) -> Path:
+    """``<fecha>.log``; si ya existe (dos lanzamientos en el mismo segundo), ``-2``, ``-3``…"""
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    path = folder / f"{stamp}.log"
+    counter = 2
+    while path.exists():
+        path = folder / f"{stamp}-{counter}.log"
+        counter += 1
+    return path
+
+
+def _prune_logs(folder: Path, keep: int) -> None:
+    logs = sorted(folder.glob("*.log"), key=lambda p: p.stat().st_mtime)
+    for old in logs[: max(0, len(logs) - keep)]:
+        try:
+            old.unlink()
+        except OSError as exc:
+            log.warning("No se puede borrar el log antiguo %s: %s", old, exc)
+
 
 class ProcessError(RuntimeError):
     pass
@@ -75,6 +98,7 @@ class GameProcess(QObject):
         *,
         log_dir: Path | None = None,
         stop_grace_ms: int = 5000,
+        max_logs: int = MAX_GAME_LOGS,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -83,6 +107,7 @@ class GameProcess(QObject):
         self.outcome: LaunchOutcome | None = None
         self.log_file: Path | None = None
         self._log_dir = log_dir
+        self._max_logs = max_logs
         self._grace_ms = stop_grace_ms
         self._buffer = ""
         self._started_at = 0.0
@@ -221,13 +246,13 @@ class GameProcess(QObject):
         folder = self._log_dir / "games" / self.spec.game_id
         try:
             folder.mkdir(parents=True, exist_ok=True)
-            stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-            self.log_file = folder / f"{stamp}.log"
-            self._log = self.log_file.open("a", encoding="utf-8")
+            self.log_file = _new_log_path(folder)
+            self._log = self.log_file.open("x", encoding="utf-8")
         except OSError as exc:
             log.warning("No se puede crear el log de %s: %s", self.spec.game_id, exc)
             self.log_file = None
             return
+        _prune_logs(folder, self._max_logs)
         wine_vars = {k: v for k, v in self.spec.environment.items() if k.startswith("WINE")}
         self._write_log(f"--- {self.spec.game_id} · {datetime.now().isoformat(timespec='seconds')}")
         self._write_log(f"Programa: {self.spec.program}")
@@ -257,18 +282,20 @@ class ProcessManager(QObject):
         *,
         log_dir: Path | None = None,
         stop_grace_ms: int = 5000,
+        max_logs: int = MAX_GAME_LOGS,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self._log_dir = log_dir
         self._grace_ms = stop_grace_ms
+        self._max_logs = max_logs
         self._active: dict[str, GameProcess] = {}
 
     def launch(self, spec: LaunchSpec) -> GameProcess:
         if spec.game_id in self._active:
             raise ProcessError(f"{spec.game_id} ya se está ejecutando")
         process = GameProcess(spec, log_dir=self._log_dir, stop_grace_ms=self._grace_ms,
-                              parent=self)  # fmt: skip
+                              max_logs=self._max_logs, parent=self)  # fmt: skip
         process.finished.connect(self._on_finished)
         self._active[spec.game_id] = process
         try:
