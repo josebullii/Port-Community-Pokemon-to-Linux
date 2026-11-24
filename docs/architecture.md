@@ -143,10 +143,18 @@ Decisiones, comprobadas con Wine 9.0 en Ubuntu 24.04:
 | **`WINEDLLOVERRIDES=mscoree=;mshtml=`** | Evita que Wine ofrezca instalar Mono o Gecko con ventanas emergentes. |
 | **Se descartan los `WINE*` del entorno del usuario** | Un `WINEPREFIX` o un `WINEARCH` propios no deben mezclarse con el prefijo del juego. |
 | **Nunca se recrea ni se borra un prefijo sin pedirlo** | `ensure` falla si el prefijo existe con otra arquitectura. `delete` no sigue enlaces simbólicos. |
+| **Los prefijos a medias o fallidos se borran** | Si `wineboot` falla o se interrumpe (incluido Ctrl+C), o si el prefijo nuevo no supera el programa de prueba, se borra. Si se quedara, el siguiente intento lo reutilizaría sin comprobarlo o fallaría con "no se sobrescribe". |
+| **Logs por lanzamiento con retención** | `logs/games/<id>/<fecha>.log`, con nombres únicos. Se conservan los últimos 20 por juego. |
+
+Comprobado con Wine real (prueba `test_stop_game_closes_game_and_secondary_processes`): `stop_game` cierra el juego y otro programa lanzado aparte en el mismo prefijo antes de que actúe el cierre forzado, y después no queda ningún proceso en el prefijo.
+
+**Pendiente para el sprint 5 (interfaz):**
+- La página "Diagnóstico" ejecuta `wine --version` en el hilo de la interfaz. Tarda milisegundos, pero si Wine se colgara bloquearía la ventana hasta 30 s.
+- `prepare_launch` puede tardar segundos (crear el prefijo) y tendrá que ejecutarse en un hilo de trabajo.
 
 ### Programa de prueba
 
-`test_program.py` genera byte a byte un ejecutable PE real de 32 o 64 bits que solo llama a `kernel32!ExitProcess(código)`. Así se puede comprobar Wine y probar el lanzador de extremo a extremo sin compiladores, sin binarios en el repositorio y sin juegos con copyright.
+`test_program.py` genera byte a byte un ejecutable PE real de 32 o 64 bits que llama a `kernel32!Sleep(ms)` y después a `kernel32!ExitProcess(código)`. Con `sleep_ms` grande sirve para probar cómo se detiene un programa en marcha. Así se puede comprobar Wine y probar el lanzador de extremo a extremo sin compiladores, sin binarios en el repositorio y sin juegos con copyright.
 
 ## Principios
 

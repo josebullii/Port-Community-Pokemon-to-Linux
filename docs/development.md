@@ -130,10 +130,14 @@ pokemon-to-linux-cli run "/ruta/al/juego"    # prepara el prefijo y lanza el jue
 pokemon-to-linux-cli run "/ruta/al/juego" --arch win32 --id mi-juego --timeout 60
 ```
 
-`run` devuelve el código de salida del juego. Si no terminó normalmente devuelve `1`, y si no se pudo lanzar, `2`. Ctrl+C lo detiene de forma ordenada (`wineserver -k`).
+`run` devuelve el código de salida del juego. Si no terminó normalmente devuelve `1`, y si no se pudo lanzar, `2`.
+
+Ctrl+C:
+- **Con el juego en marcha**, lo detiene de forma ordenada (`wineserver -k`).
+- **Mientras se prepara el prefijo**, cancela, borra el prefijo a medias y devuelve `130`.
 
 - **Prefijos**: `~/.local/share/pokemon-to-linux/prefixes/<id>`.
-- **Log de cada lanzamiento**: `~/.local/state/pokemon-to-linux/logs/games/<id>/<fecha>.log`.
+- **Log de cada lanzamiento**: `~/.local/state/pokemon-to-linux/logs/games/<id>/<fecha>.log`. Se conservan los últimos 20 por juego.
 
 ## Integración continua
 

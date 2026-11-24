@@ -249,7 +249,7 @@ pokemon-to-linux-cli wine --probe            # ¿Wine ejecuta 32 y 64 bits?
 pokemon-to-linux-cli run "/ruta/al/juego"    # prepara el prefijo y lanza el juego
 ```
 
-La primera vez se crea el prefijo del juego, lo que tarda unos segundos. Cada ejecución deja un log en `~/.local/state/pokemon-to-linux/logs/games/<id>/`.
+La primera vez se crea el prefijo del juego, lo que tarda unos segundos. Cada ejecución deja un log en `~/.local/state/pokemon-to-linux/logs/games/<id>/`, donde se conservan los 20 últimos. Ctrl+C detiene el juego de forma ordenada, cerrando también sus procesos secundarios.
 
 ### Pruebas y lint
 
