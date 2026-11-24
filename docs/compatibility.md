@@ -41,8 +41,10 @@ Pokémon to Linux · diagnóstico
   Título:      Pokemon Z
   Motor:       RPG Maker XP (detectado, confianza 100%)
   Runtime:     mkxp-z (SDL2 2.0.12)
+  RGSS:        RGSS104E.dll (versión 1.04, i386)
   Ejecutable:  Game.exe (i386, 32 bits, gui)
   OpenGL:      sí
+  DLL:         16 de sistema, 0 incluidas, 0 redistribuibles, 0 faltan
   Ficheros:    19.070 (873,5 MB)
 
   Indicios:
@@ -65,6 +67,8 @@ Mismo resultado en Windows 11 y en Ubuntu 24.04. La prueba `tests/integration/te
 - **El ejecutable es de 32 bits (i386).** El prefijo Wine tiene que poder ejecutar binarios win32, sea un prefijo win32 o uno WoW64.
 - **`Game.exe` importa `OPENGL32.DLL`.** El sistema necesita OpenGL funcional, también en 32 bits si Wine no usa WoW64.
 - **SDL2 va enlazado dentro de `Game.exe`.** No hay que buscar `SDL2.dll`.
+- **Las 16 DLL que importa `Game.exe` son de sistema** (Wine las implementa todas). No hace falta ningún redistribuible.
+- **Las DLL RGSS (1.02 E/J y 1.04 E) son i386 válidas**, aunque mkxp-z no las carga.
 - **No hace falta ningún RTP** (`RTP1`, `RTP2` y `RTP3` están vacíos).
 
 ### Contenido de la carpeta

@@ -28,7 +28,8 @@ Pokémon to Linux es un lanzador y gestor de compatibilidad. No reescribe los ju
 | `config.py` | `AppPaths`: rutas XDG de la app (datos, config, caché, estado, prefijos, BD, logs) | 1 ✅ |
 | `infrastructure/logging/` | Log rotativo en fichero + consola, `excepthook` global | 1 ✅ |
 | `ui/main_window.py` | Ventana principal: Biblioteca, Diagnóstico, Acerca de | 1 ✅ |
-| `infrastructure/filesystem/game_scanner.py` | `GameScanner`: inventario de la carpeta. Búsquedas sin distinguir mayúsculas, sin seguir enlaces simbólicos y con límite de ficheros | 2 ✅ |
+| `infrastructure/filesystem/game_scanner.py` | `GameScanner`: inventario de la carpeta. Búsquedas sin distinguir mayúsculas, sin seguir enlaces simbólicos ni junctions de NTFS, y con límite de ficheros | 2 ✅ |
+| `domain/dependencies.py` | Clasifica las DLL importadas: incluidas, de sistema, redistribuibles o que faltan | 2 ✅ |
 | `infrastructure/filesystem/ini_reader.py` | Lectura de `Game.ini`: detecta UTF-8, Shift-JIS o cp1252 y normaliza claves | 2 ✅ |
 | `infrastructure/filesystem/pe_inspector.py` | Cabeceras PE: arquitectura, 32/64 bits, DLL importadas y marcadores binarios | 2 ✅ |
 | `engines/base.py`, `engines/detector.py` | Contrato `EngineDetector` y `DetectionResult`. `detect_engine` elige el mejor resultado | 2 ✅ |
@@ -70,6 +71,28 @@ El runtime se identifica buscando marcadores dentro del ejecutable:
 - en cualquier otro caso → **unknown**
 
 Con mkxp-z no se avisa de que falte la DLL indicada en `Library=`, porque no la usa.
+
+### DLL RGSS
+
+De cada `RGSS1xx*.dll` se obtienen:
+- **Versión y edición**, a partir del nombre: `RGSS104E` es la 1.04, edición inglesa.
+- **Validez y arquitectura**, a partir de la cabecera PE.
+
+Si el runtime carga la DLL (`rgss1`), se avisa cuando:
+- falta;
+- está dañada o es un ejecutable en vez de una DLL;
+- su arquitectura no coincide con la del ejecutable.
+
+### Dependencias PE
+
+Las DLL que importa el ejecutable (y la DLL RGSS, si se carga) se clasifican en el mismo orden en que Windows las busca:
+
+1. `bundled`: en la carpeta del juego.
+2. `system`: las trae Windows y Wine las implementa.
+3. `redistributable`: Visual C++, DirectX, OpenAL…
+4. `missing`: ninguna de las anteriores.
+
+Las dos últimas generan advertencia.
 
 ## Rutas en tiempo de ejecución (XDG)
 

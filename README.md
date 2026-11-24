@@ -231,8 +231,10 @@ pokemon-to-linux-cli analyze "/ruta/a/POKEMON Z V2.19" --json   # JSON
 ```
   Motor:       RPG Maker XP (detectado, confianza 100%)
   Runtime:     mkxp-z (SDL2 2.0.12)
+  RGSS:        RGSS104E.dll (versión 1.04, i386)
   Ejecutable:  Game.exe (i386, 32 bits, gui)
   OpenGL:      sí
+  DLL:         16 de sistema, 0 incluidas, 0 redistribuibles, 0 faltan
 ```
 
 El informe completo de Pokémon Z está en [docs/compatibility.md](docs/compatibility.md).
