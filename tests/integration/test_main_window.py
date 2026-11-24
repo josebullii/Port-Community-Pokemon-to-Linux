@@ -38,3 +38,48 @@ def test_window_shows_without_errors(window, qapp):
     window.show()
     qapp.processEvents()
     assert window.isVisible()
+
+
+def _diagnostics_text(window):
+    from PySide6.QtWidgets import QLabel
+
+    page = window.pages.widget(1)
+    return " ".join(label.text() for label in page.findChildren(QLabel))
+
+
+def test_diagnostics_shows_wine_not_installed(qapp, tmp_path, monkeypatch):
+    from pokemon_to_linux.ui.main_window import MainWindow
+
+    monkeypatch.setattr("pokemon_to_linux.ui.main_window.WineManager.detect", lambda self: None)
+    win = MainWindow(AppPaths.from_environment(env={}, home=tmp_path))
+
+    assert "no instalado" in _diagnostics_text(win)
+    win.deleteLater()
+
+
+def test_diagnostics_shows_wine_version(qapp, tmp_path, monkeypatch):
+    from pathlib import Path
+
+    from pokemon_to_linux.infrastructure.wine.wine_manager import WineInstallation
+    from pokemon_to_linux.ui.main_window import MainWindow
+
+    wine = WineInstallation(Path("/usr/bin/wine"), None, "9.0", None, "wine-9.0 (Ubuntu)")
+    monkeypatch.setattr("pokemon_to_linux.ui.main_window.WineManager.detect", lambda self: wine)
+    win = MainWindow(AppPaths.from_environment(env={}, home=tmp_path))
+
+    assert "wine-9.0 (Ubuntu)" in _diagnostics_text(win)
+    win.deleteLater()
+
+
+def test_diagnostics_shows_wine_error(qapp, tmp_path, monkeypatch):
+    from pokemon_to_linux.infrastructure.wine.wine_manager import WineError
+    from pokemon_to_linux.ui.main_window import MainWindow
+
+    def broken(self):
+        raise WineError("wine --version falló")
+
+    monkeypatch.setattr("pokemon_to_linux.ui.main_window.WineManager.detect", broken)
+    win = MainWindow(AppPaths.from_environment(env={}, home=tmp_path))
+
+    assert "error: wine --version falló" in _diagnostics_text(win)
+    win.deleteLater()
