@@ -13,6 +13,7 @@ def test_analyze_text_report(make_game, capsys):
     assert code == EXIT_DETECTED
     assert "RPG Maker XP (detectado, confianza 100%)" in out
     assert "mkxp-z (SDL2 2.0.12)" in out
+    assert "RGSS:        RGSS104E.dll (versión 1.04, i386)" in out
     assert "Game.exe (i386, 32 bits, gui)" in out
     assert "OpenGL:      sí" in out
     assert "(ninguna)" in out

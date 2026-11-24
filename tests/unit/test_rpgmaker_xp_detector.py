@@ -3,7 +3,7 @@ import pytest
 from conftest import build_game_ini
 from pokemon_to_linux.engines.base import DETECTION_THRESHOLD
 from pokemon_to_linux.engines.detector import detect_engine
-from pokemon_to_linux.engines.rpgmaker_xp.detector import RPGMakerXPDetector
+from pokemon_to_linux.engines.rpgmaker_xp.detector import RPGMakerXPDetector, parse_rgss_name
 from pokemon_to_linux.infrastructure.filesystem.game_scanner import GameScanner
 
 
@@ -207,3 +207,81 @@ def test_detect_engine_without_detectors(tmp_path):
 
     assert result.engine == "unknown"
     assert result.detected is False
+
+
+# --- DLL RGSS: versión y arquitectura --------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("RGSS104E.dll", {"version": "1.04", "edition": "inglesa"}),
+        ("rgss102j.DLL", {"version": "1.02", "edition": "japonesa"}),
+        ("RGSS100.dll", {"version": "1.00", "edition": "sin indicar"}),
+        ("RGSS103X.dll", {"version": "1.03", "edition": "desconocida (x)"}),
+        ("RGSS301.dll", {"version": "3.01", "edition": "sin indicar"}),
+        ("otra.dll", None),
+    ],
+)
+def test_parse_rgss_name(name, expected):
+    assert parse_rgss_name(name) == expected
+
+
+def test_rgss_dll_info(make_game):
+    result = detect(make_game(dlls=("RGSS102J.dll", "RGSS104E.dll")))
+
+    assert result.details["rgss_library_version"] == "1.04"
+    info = {i["name"]: i for i in result.details["rgss_dll_info"]}
+    assert info["RGSS104E.dll"] == {
+        "name": "RGSS104E.dll",
+        "path": "RGSS104E.dll",
+        "version": "1.04",
+        "edition": "inglesa",
+        "architecture": "i386",
+        "bits": 32,
+        "valid": True,
+        "error": None,
+    }
+    assert info["RGSS102J.dll"]["edition"] == "japonesa"
+
+
+def test_library_in_subfolder_is_inspected(make_game, make_pe):
+    game = make_game(
+        ini=build_game_ini(library=r"System\RGSS104E.dll"),
+        dlls=(),
+        extra={"System/RGSS104E.dll": make_pe(dll=True)},
+    )
+    result = detect(game)
+
+    assert [i["path"] for i in result.details["rgss_dll_info"]] == ["System/RGSS104E.dll"]
+    assert result.warnings == ()
+
+
+def test_corrupt_library_dll_warns(make_game):
+    result = detect(make_game(dlls=(), extra={"RGSS104E.dll": b"basura"}))
+
+    assert result.details["rgss_dll_info"][0]["valid"] is False
+    assert any("RGSS104E.dll no es una DLL válida" in w for w in result.warnings)
+
+
+def test_library_that_is_an_exe_warns(make_game, make_pe):
+    result = detect(make_game(dlls=(), extra={"RGSS104E.dll": make_pe(dll=False)}))
+
+    assert any("es un ejecutable, no una DLL" in w for w in result.warnings)
+
+
+def test_library_architecture_mismatch_warns(make_game, make_pe):
+    dll64 = make_pe(machine=0x8664, pe32_plus=True, dll=True)
+    result = detect(make_game(dlls=(), extra={"RGSS104E.dll": dll64}))
+
+    assert any(
+        "x86_64" in w and "i386" in w and "no pueden funcionar juntos" in w for w in result.warnings
+    )
+
+
+def test_corrupt_library_dll_is_fine_with_mkxp_z(make_game):
+    """mkxp-z no carga la DLL, así que una DLL rota no es un problema."""
+    result = detect(make_game(exe="mkxp-z", dlls=(), extra={"RGSS104E.dll": b"basura"}))
+
+    assert result.details["rgss_dll_info"][0]["valid"] is False
+    assert result.warnings == ()

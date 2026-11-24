@@ -34,6 +34,23 @@ RGSS1_DLL = re.compile(r"^rgss1\d\d[a-z]?\.dll$", re.IGNORECASE)
 RGSS2_DLL = re.compile(r"^rgss2\d\d[a-z]?\.dll$", re.IGNORECASE)  # RPG Maker VX
 RGSS3_DLL = re.compile(r"^rgss3\d\d[a-z]?\.dll$", re.IGNORECASE)  # RPG Maker VX Ace
 
+RGSS_NAME = re.compile(r"^rgss(?P<major>\d)(?P<minor>\d\d)(?P<edition>[a-z]?)\.dll$", re.IGNORECASE)
+EDITIONS = {"e": "inglesa", "j": "japonesa"}
+MKXP_RUNTIMES = ("mkxp-z", "mkxp")
+
+
+def parse_rgss_name(name: str) -> dict[str, str] | None:
+    """``RGSS104E.dll`` → ``{"version": "1.04", "edition": "inglesa"}``."""
+    match = RGSS_NAME.match(name)
+    if match is None:
+        return None
+    edition = match["edition"].lower()
+    return {
+        "version": f"{match['major']}.{match['minor']}",
+        "edition": EDITIONS.get(edition, f"desconocida ({edition})" if edition else "sin indicar"),
+    }
+
+
 RUNTIME_MARKERS = {
     "mkxp_z": re.compile(rb"mkxp-z"),
     "mkxp": re.compile(rb"mkxp"),
@@ -152,14 +169,31 @@ class RPGMakerXPDetector(EngineDetector):
                 f"No se encuentra el archivo de scripts indicado en Game.ini: {scripts}"
             )
 
-        # DLL indicada en el INI (mkxp-z no la necesita).
+        # DLL RGSS: versión (del nombre), validez y arquitectura (de la cabecera PE).
         lib_name = PureWindowsPath(library).name if library else ""
-        needs_dll = runtime not in ("mkxp-z", "mkxp") and RGSS1_DLL.match(lib_name)
-        dll_present = scan.find_relative(library or "") or scan.find_file(lib_name)
-        if library and needs_dll and not dll_present:
-            warnings.append(
-                f"Game.ini indica {library}, pero esa DLL no está en la carpeta del juego."
-            )
+        lib_rel = (scan.find_relative(library) or scan.find_file(lib_name)) if library else None
+        dll_infos = [self._inspect_rgss_dll(scan, rel) for rel in rgss1]
+        if lib_rel and RGSS1_DLL.match(lib_name) and lib_rel not in rgss1:
+            dll_infos.append(self._inspect_rgss_dll(scan, lib_rel))  # p. ej. System/RGSS…
+        details["rgss_dll_info"] = dll_infos
+        if (lib_version := parse_rgss_name(lib_name)) is not None:
+            details["rgss_library_version"] = lib_version["version"]
+
+        # Solo importa si el runtime carga la DLL (mkxp-z no la usa).
+        if library and RGSS1_DLL.match(lib_name) and runtime not in MKXP_RUNTIMES:
+            lib_info = next((i for i in dll_infos if i["path"] == lib_rel), None)
+            exe_arch = details.get("architecture")
+            if lib_info is None:
+                warnings.append(
+                    f"Game.ini indica {library}, pero esa DLL no está en la carpeta del juego."
+                )
+            elif not lib_info["valid"]:
+                warnings.append(f"{lib_info['name']} no es una DLL válida: {lib_info['error']}")
+            elif exe_arch and lib_info["architecture"] != exe_arch:
+                warnings.append(
+                    f"{lib_info['name']} es {lib_info['architecture']} y {executable} es "
+                    f"{exe_arch}: no pueden funcionar juntos."
+                )
 
         confidence = max(0.0, min(1.0, sum(e.weight for e in evidence)))
         detected = confidence >= DETECTION_THRESHOLD and xp_specific
@@ -187,6 +221,20 @@ class RPGMakerXPDetector(EngineDetector):
         except IniReadError as exc:
             warnings.append(f"No se ha podido leer Game.ini: {exc}")
             return None
+
+    @staticmethod
+    def _inspect_rgss_dll(scan: GameScan, relative: str) -> dict[str, Any]:
+        name = relative.rsplit("/", 1)[-1]
+        info: dict[str, Any] = {"name": name, "path": relative}
+        info.update(parse_rgss_name(name) or {})
+        try:
+            pe = parse_pe(read_binary(scan.path_of(relative)))
+        except NotPEError as exc:
+            info.update(valid=False, architecture=None, error=str(exc))
+            return info
+        info.update(architecture=pe.machine, bits=pe.bits, valid=pe.is_dll)
+        info["error"] = None if pe.is_dll else "es un ejecutable, no una DLL"
+        return info
 
     @staticmethod
     def _choose_executable(

@@ -57,6 +57,13 @@ def format_report(analysis: GameAnalysis) -> str:
     if det.get("sdl2_version"):
         runtime += f" (SDL2 {det['sdl2_version']})"
     row("Runtime:", runtime)
+    if det.get("rgss_library_version"):
+        lib = det["ini_library"]
+        info = next(
+            (i for i in det.get("rgss_dll_info", []) if i["name"].lower() in lib.lower()), {}
+        )
+        extra = f", {info['architecture']}" if info.get("architecture") else ""
+        row("RGSS:", f"{lib} (versión {det['rgss_library_version']}{extra})")
     if d.executable:
         exe = d.executable
         if "architecture" in det:
