@@ -55,6 +55,7 @@ log = get_logger(__name__)
 EXIT_OK = EXIT_DETECTED = 0
 EXIT_NOT_DETECTED = 1
 EXIT_ERROR = 2
+EXIT_CANCELLED = 130  # convención de las shells para Ctrl+C
 
 NO_WINE_MESSAGE = (
     "Wine no está instalado. Instálalo desde los repositorios de tu distribución "
@@ -187,6 +188,11 @@ def _error(message: object) -> int:
     return EXIT_ERROR
 
 
+def _cancelled() -> int:
+    print("\nCancelado.", file=sys.stderr)
+    return EXIT_CANCELLED
+
+
 def _detect_wine() -> WineInstallation | None:
     """Detecta Wine; si no está, explica cómo instalarlo y devuelve ``None``."""
     installation = WineManager().detect()
@@ -232,8 +238,12 @@ def cmd_wine(args: argparse.Namespace) -> int:
         prefix = prefixes.create(game_id, "win64")
     except (PrefixError, WineError) as exc:
         return _error(f"no se pudo crear un prefijo: {exc}")
+    except KeyboardInterrupt:
+        return _cancelled()
     try:
         results = [prefixes.run_test_program(prefix, bits) for bits in (64, 32)]
+    except KeyboardInterrupt:
+        return _cancelled()
     finally:
         prefixes.delete(game_id)
     for result in results:
@@ -260,6 +270,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         )
     except (GameScanError, LaunchError, PrefixError, WineError) as exc:
         return _error(exc)
+    except KeyboardInterrupt:
+        return _cancelled()  # PrefixManager ya ha borrado el prefijo a medias
 
     print(f"  {'Juego:':<12} {plan.game_id}")
     print(f"  {'Ejecutable:':<12} {plan.executable}")

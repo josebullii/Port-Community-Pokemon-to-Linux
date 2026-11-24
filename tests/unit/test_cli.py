@@ -196,3 +196,49 @@ def test_run_when_wine_fails_to_start(qapp, fake_wine, make_game, capsys):
     assert "(win64)" in out
     assert "Fin: failed" in out
     assert "Log:" in out
+
+
+def test_run_ctrl_c_while_preparing(fake_wine, make_game, monkeypatch, capsys):
+    def interrupted(*_args, **_kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("pokemon_to_linux.cli.prepare_launch", interrupted)
+
+    assert main(["run", str(make_game(exe="runnable"))]) == 130
+    err = capsys.readouterr().err
+    assert "Cancelado." in err
+    assert "Traceback" not in err
+
+
+def test_wine_probe_ctrl_c(fake_wine, monkeypatch, capsys):
+    from pokemon_to_linux.infrastructure.wine.prefix_manager import PrefixManager
+
+    def interrupted(self, prefix, bits, timeout=120):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(PrefixManager, "run_test_program", interrupted)
+
+    assert main(["wine", "--probe"]) == 130
+    assert "Cancelado." in capsys.readouterr().err
+
+
+def test_wine_probe_prefix_creation_fails(fake_wine, capsys):
+    from test_prefix_manager import FakeWine
+
+    fake_wine["fake"] = FakeWine(wineboot_code=1)
+
+    assert main(["wine", "--probe"]) == EXIT_ERROR
+    assert "no se pudo crear un prefijo" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("command", [["wine"], ["run", "."]])
+def test_broken_wine_is_an_error(command, monkeypatch, capsys):
+    from pokemon_to_linux.infrastructure.wine.wine_manager import WineError
+
+    def broken(self):
+        raise WineError("wine --version falló (código 1)")
+
+    monkeypatch.setattr("pokemon_to_linux.cli.WineManager.detect", broken)
+
+    assert main(command) == EXIT_ERROR
+    assert "wine --version falló" in capsys.readouterr().err

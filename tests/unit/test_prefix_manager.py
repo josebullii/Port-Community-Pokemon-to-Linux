@@ -253,3 +253,40 @@ def test_run_test_program_timeout_is_a_failed_result(prefixes):
 
     assert result.ok is False
     assert result.exit_code is None
+
+
+# --- Interrupciones durante la creación ------------------------------------------
+
+
+def test_ctrl_c_during_wineboot_removes_partial_prefix(prefixes):
+    """Regresión: un Ctrl+C dejaba un prefijo sin system.reg que bloqueaba los reintentos."""
+    calls = []
+
+    def interrupted(args, env, timeout, cwd):
+        calls.append(list(args[1:]))
+        if args[1:] == ["wineboot", "--init"]:
+            (Path(env["WINEPREFIX"]) / "drive_c").mkdir(parents=True)
+            raise KeyboardInterrupt
+        return CommandResult(0, "")
+
+    pm = manager(prefixes, interrupted)
+    with pytest.raises(KeyboardInterrupt):
+        pm.create("juego")
+
+    assert not (prefixes / "juego").exists()
+    assert ["-k"] in calls  # se cierran los procesos que quedaran
+
+    # El siguiente intento funciona en vez de fallar con "no se sobrescribe".
+    assert manager(prefixes, FakeWine()).ensure("juego").arch == "win64"
+
+
+def test_cleanup_still_removes_prefix_if_wineserver_fails(prefixes):
+    def broken(args, env, timeout, cwd):
+        if args[1:] == ["wineboot", "--init"]:
+            Path(env["WINEPREFIX"]).mkdir(parents=True)
+            return CommandResult(1, "fallo")
+        raise WineTimeoutError("wineserver colgado")
+
+    with pytest.raises(PrefixError, match="wineboot falló"):
+        manager(prefixes, broken).create("juego")
+    assert not (prefixes / "juego").exists()

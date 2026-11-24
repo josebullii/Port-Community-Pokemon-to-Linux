@@ -138,7 +138,10 @@ class PrefixManager:
         resolve_arch(None, arch)
         path = self.path_for(game_id)
         if path.exists() and any(path.iterdir()):
-            raise PrefixError(f"Ya existe una carpeta en {path}; no se sobrescribe.")
+            raise PrefixError(
+                f"Ya existe una carpeta en {path} que no es un prefijo completo; no se "
+                "sobrescribe. Bórrala si quieres que se vuelva a crear."
+            )
         self.prefixes_dir.mkdir(parents=True, exist_ok=True)
 
         env = wine_environment(path, arch=arch)
@@ -158,11 +161,23 @@ class PrefixManager:
                     f"El prefijo se creó como {created or 'desconocido'} en vez de {arch}. "
                     "Puede que esta versión de Wine no admita prefijos de esa arquitectura."
                 )
-        except (PrefixError, WineError):
-            self._remove(path)  # no dejar prefijos a medio crear
+        except BaseException:
+            # Cualquier fallo, incluido Ctrl+C: un prefijo a medio crear no
+            # tiene system.reg y bloquearía los siguientes intentos.
+            self._abort_creation(path, env)
             raise
         log.info("Prefijo %s listo en %.1f s", game_id, time.monotonic() - started)
         return Prefix(game_id, path, arch)
+
+    def _abort_creation(self, path: Path, env: dict[str, str]) -> None:
+        """Cierra lo que haya quedado en marcha y borra el prefijo a medias."""
+        if self.wine.wineserver is not None:
+            try:
+                self._run([str(self.wine.wineserver), "-k"], env, 30, None)
+            except Exception as exc:  # noqa: BLE001 - limpieza: lo importante es borrar
+                log.warning("wineserver -k falló al limpiar %s: %s", path, exc)
+        self._remove(path)
+        log.info("Creación del prefijo cancelada; borrado %s", path)
 
     def _wait_for_registry(self, path: Path, env: dict[str, str]) -> None:
         if self.wine.wineserver is not None:
