@@ -101,3 +101,21 @@ def test_delete_removes_prefix(prefix_manager):
     prefix = prefix_manager.create("prueba-borrar", "win64")
     assert prefix_manager.delete(prefix.game_id) is True
     assert not prefix.path.exists()
+
+
+def test_cli_wine_probe(wine, xdg_tmp, capsys):
+    from pokemon_to_linux.cli import main
+
+    assert main(["wine", "--probe"]) == 0
+    out = capsys.readouterr().out
+    assert "32 bits:     sí" in out
+
+
+def test_cli_run_test_game(wine, qapp, xdg_tmp, make_game, capsys):
+    """El juego de prueba lanzado desde la CLI devuelve su código de salida (7)."""
+    from conftest import RUNNABLE_EXIT_CODE
+    from pokemon_to_linux.cli import main
+
+    assert main(["run", str(make_game(exe="runnable"))]) == RUNNABLE_EXIT_CODE
+    out = capsys.readouterr().out
+    assert "Fin: finished, código de salida 7" in out

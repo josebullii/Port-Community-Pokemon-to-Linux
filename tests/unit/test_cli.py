@@ -117,3 +117,82 @@ def test_rgss_line_matches_library_in_subfolder(make_game, make_pe, capsys):
     main(["analyze", str(game)])
 
     assert r"RGSS:        System\RGSS104E.dll (versión 1.04, i386)" in capsys.readouterr().out
+
+
+# --- wine y run (con Wine simulado) --------------------------------------------
+
+
+@pytest.fixture
+def no_wine(monkeypatch):
+    monkeypatch.setattr("pokemon_to_linux.cli.WineManager.detect", lambda self: None)
+
+
+@pytest.fixture
+def fake_wine(monkeypatch, tmp_path):
+    """Wine simulado: detect() devuelve una instalación y PrefixManager usa FakeWine."""
+    from test_prefix_manager import FakeWine
+
+    from pokemon_to_linux.infrastructure.wine.prefix_manager import PrefixManager
+    from pokemon_to_linux.infrastructure.wine.wine_manager import WineInstallation
+
+    state = {"fake": FakeWine()}
+    wine = WineInstallation(
+        tmp_path / "no-existe" / "wine", tmp_path / "no-existe" / "wineserver",
+        "9.0", None, "wine-9.0",
+    )  # fmt: skip
+    monkeypatch.setattr("pokemon_to_linux.cli.WineManager.detect", lambda self: wine)
+    monkeypatch.setattr(
+        "pokemon_to_linux.cli.PrefixManager",
+        lambda d, w: PrefixManager(d, w, runner=state["fake"], registry_wait=0.2),
+    )
+    return state
+
+
+def test_wine_not_installed(no_wine, capsys):
+    assert main(["wine"]) == EXIT_NOT_DETECTED
+    assert "Wine no está instalado" in capsys.readouterr().err
+
+
+def test_run_without_wine(no_wine, make_game, capsys):
+    assert main(["run", str(make_game(exe="runnable"))]) == EXIT_ERROR
+    assert "no lo instala por ti" in capsys.readouterr().err
+
+
+def test_wine_info(fake_wine, capsys):
+    assert main(["wine"]) == 0
+    out = capsys.readouterr().out
+    assert "wine-9.0" in out
+    assert "wineserver:" in out
+
+
+def test_wine_probe_ok(fake_wine, capsys):
+    assert main(["wine", "--probe"]) == 0
+    out = capsys.readouterr().out
+    assert "64 bits:     sí" in out
+    assert "32 bits:     sí" in out
+
+
+def test_wine_probe_without_32_bit_support(fake_wine, capsys):
+    from test_prefix_manager import FakeWine
+
+    fake_wine["fake"] = FakeWine(program_code=1)
+    assert main(["wine", "--probe"]) == EXIT_NOT_DETECTED
+    out = capsys.readouterr().out
+    assert "32 bits:     NO" in out
+    assert "wine32:i386" in out
+
+
+def test_run_unknown_game(fake_wine, tmp_path, capsys):
+    assert main(["run", str(tmp_path)]) == EXIT_ERROR
+    assert "motor" in capsys.readouterr().err
+
+
+def test_run_when_wine_fails_to_start(qapp, fake_wine, make_game, capsys):
+    code = main(["run", str(make_game(exe="runnable")), "--id", "prueba"])
+    out = capsys.readouterr().out
+
+    assert code == EXIT_NOT_DETECTED
+    assert "Juego:       prueba" in out
+    assert "(win64)" in out
+    assert "Fin: failed" in out
+    assert "Log:" in out
