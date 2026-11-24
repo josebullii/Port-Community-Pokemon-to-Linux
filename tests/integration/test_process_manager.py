@@ -162,3 +162,17 @@ def test_manager_launch_error_does_not_leave_entry(qapp, tmp_path):
     with pytest.raises(ProcessError):
         manager.launch(bad)
     assert not manager.is_running("b")
+
+
+def test_stop_game_use_case(qapp, tmp_path):
+    from pokemon_to_linux.application.launch_game import stop_game
+
+    manager = ProcessManager(stop_grace_ms=300)
+    process = manager.launch(spec(tmp_path, "import time; time.sleep(60)", game_id="c"))
+    assert process._process.waitForStarted(10_000)
+
+    stop_game("c", manager)
+    stop_game("no-existe", manager)  # parar un juego que no está en marcha no falla
+
+    assert process.wait(10_000)
+    assert process.outcome.state is ProcessState.STOPPED
