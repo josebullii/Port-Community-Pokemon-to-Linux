@@ -69,6 +69,34 @@ def test_win32_prefix(prefix_manager):
         prefix_manager.delete(prefix.game_id)
 
 
+def test_test_game_runs_end_to_end(qapp, wine, prefix_manager, make_game, tmp_path):
+    """Entregable del sprint 3: un juego de prueba ejecutado desde Python.
+
+    Juego RPG Maker XP falso cuyo Game.exe es un programa real de 32 bits
+    (como Pokémon Z) que termina con código 7.
+    """
+    from conftest import RUNNABLE_EXIT_CODE
+    from pokemon_to_linux.application.launch_game import launch_game, prepare_launch
+    from pokemon_to_linux.infrastructure.wine.process_manager import (
+        ProcessManager,
+        ProcessState,
+    )
+
+    plan = prepare_launch(make_game(exe="runnable"), wine=wine, prefixes=prefix_manager)
+    assert plan.test_result.ok  # el prefijo nuevo ejecuta 32 bits
+
+    processes = ProcessManager(log_dir=tmp_path / "logs")
+    process = launch_game(plan, processes)
+    assert process.wait(120_000)
+
+    outcome = process.outcome
+    assert outcome.state is ProcessState.FINISHED, outcome
+    assert outcome.exit_code == RUNNABLE_EXIT_CODE
+    assert "código de salida 7" in outcome.log_file.read_text(encoding="utf-8")
+    assert not processes.is_running(plan.game_id)
+    prefix_manager.delete(plan.game_id)
+
+
 def test_delete_removes_prefix(prefix_manager):
     prefix = prefix_manager.create("prueba-borrar", "win64")
     assert prefix_manager.delete(prefix.game_id) is True

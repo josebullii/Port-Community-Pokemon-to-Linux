@@ -114,7 +114,17 @@ EXE_KINDS = {
         imports=("kernel32.dll", "opengl32.dll"), payload=b"\0mkxp-z\0SDL2-2.0.12\0"
     ),
     "garbage": lambda: b"esto no es un ejecutable",
+    # Ejecutable real de 32 bits que termina con código 7 (el "juego de prueba").
+    "runnable": lambda: _runnable_exe(),
 }
+
+RUNNABLE_EXIT_CODE = 7
+
+
+def _runnable_exe() -> bytes:
+    from pokemon_to_linux.infrastructure.wine.test_program import build_exit_program
+
+    return build_exit_program(RUNNABLE_EXIT_CODE, bits=32)
 
 
 @pytest.fixture
