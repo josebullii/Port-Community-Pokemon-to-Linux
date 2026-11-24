@@ -67,6 +67,14 @@ jobs:
           fi
           grep -q "Iniciando" ~/.local/state/pokemon-to-linux/logs/pokemon-to-linux.log
 
+      - name: La CLI funciona
+        run: |
+          pokemon-to-linux-cli --version
+          code=0
+          pokemon-to-linux-cli analyze . || code=$?
+          # El propio repositorio no es un juego: debe salir 1 (no detectado).
+          test "$code" -eq 1
+
       - name: Bibliotecas X11 completas
         run: |
           plugin=$(python -c "import pathlib, PySide6; print(pathlib.Path(PySide6.__file__).parent / 'Qt/plugins/platforms/libqxcb.so')")

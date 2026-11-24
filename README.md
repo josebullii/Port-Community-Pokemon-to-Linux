@@ -5,7 +5,7 @@
 
 Lanzador y gestor de compatibilidad para ejecutar en Linux **fangames de Pokémon creados para Windows**, empezando por **Pokémon Z** (RPG Maker XP / Pokémon Essentials). El objetivo final es que también funcionen en consolas portátiles Linux como la **Anbernic R36S**.
 
-> **Estado:** sprint 1 (fundación) completado: la aplicación arranca con ventana, logging y pruebas base. Aún no analiza ni lanza juegos.
+> **Estado:** sprint 2 (análisis) completado. La aplicación ya diagnostica la carpeta de un juego: motor, runtime, ejecutable, arquitectura y advertencias. Por ahora lo hace desde la terminal (`pokemon-to-linux-cli analyze`). Todavía no lanza juegos: eso llega en el sprint 3, con Wine.
 
 ---
 
@@ -221,6 +221,24 @@ pokemon-to-linux          # o bien: python -m pokemon_to_linux
 
 Los registros se guardan en `~/.local/state/pokemon-to-linux/logs/`.
 
+### Analizar un juego
+
+```bash
+pokemon-to-linux-cli analyze "/ruta/a/POKEMON Z V2.19"          # informe legible
+pokemon-to-linux-cli analyze "/ruta/a/POKEMON Z V2.19" --json   # JSON
+```
+
+```
+  Motor:       RPG Maker XP (detectado, confianza 100%)
+  Runtime:     mkxp-z (SDL2 2.0.12)
+  RGSS:        RGSS104E.dll (versión 1.04, i386)
+  Ejecutable:  Game.exe (i386, 32 bits, gui)
+  OpenGL:      sí
+  DLL:         16 de sistema, 0 incluidas, 0 redistribuibles, 0 faltan
+```
+
+El informe completo de Pokémon Z está en [docs/compatibility.md](docs/compatibility.md).
+
 ### Pruebas y lint
 
 ```bash
@@ -253,8 +271,8 @@ Cada prueba registra el juego y su versión, el motor, la distribución, la arqu
 
 | Sprint | Trabajo | Entregable |
 |---|---|---|
-| 1 · Fundación | Repositorio, `pyproject.toml`, PySide6, ventana, logging, tests base | La aplicación arranca |
-| 2 · Análisis | Escáner, lectura de `Game.ini`, detector XP/mkxp-z | Diagnóstico de Pokémon Z |
+| 1 · Fundación ✅ | Repositorio, `pyproject.toml`, PySide6, ventana, logging, tests base | La aplicación arranca |
+| 2 · Análisis ✅ | Escáner, lectura de `Game.ini`, detector XP/mkxp-z | Diagnóstico de Pokémon Z |
 | 3 · Wine | WineManager, PrefixManager, QProcess, logs | Juego de prueba lanzado desde Python |
 | 4 · Juego real | Perfil de Pokémon Z, dependencias, pruebas de juego | Pokémon Z se ejecuta por primera vez |
 | 5 · Biblioteca | SQLite, alta de juegos, biblioteca, detalles, diagnóstico | Lanzador completo de principio a fin |

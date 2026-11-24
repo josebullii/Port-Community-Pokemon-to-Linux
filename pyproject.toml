@@ -34,6 +34,9 @@ dev = [
 [project.gui-scripts]
 pokemon-to-linux = "pokemon_to_linux.main:main"
 
+[project.scripts]
+pokemon-to-linux-cli = "pokemon_to_linux.cli:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/pokemon_to_linux"]
 
@@ -42,6 +45,7 @@ testpaths = ["tests"]
 addopts = "-ra"
 markers = [
     "integration: pruebas que levantan Qt u otros componentes reales",
+    "realgame: pruebas con juegos reales; requieren variables PTL_*_PATH",
 ]
 
 [tool.ruff]

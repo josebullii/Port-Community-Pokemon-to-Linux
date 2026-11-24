@@ -78,10 +78,29 @@ Las pruebas de Qt usan `QT_QPA_PLATFORM=offscreen`, que se fija en `tests/confte
 | `qapp` | `QApplication` compartida por toda la sesión |
 | `xdg_tmp` | Redirige las cuatro rutas XDG a un directorio temporal |
 | `_reset_app_logger` | (automática) Cierra los handlers del log tras cada prueba |
+| `make_pe` | Construye un ejecutable PE mínimo y válido (arquitectura, DLL importadas, marcadores) |
+| `make_game` | Crea una carpeta de juego RPG Maker XP falsa y configurable (INI, exe, DLL, `Data/`…) |
 
 ### Archivos de juegos en las pruebas
 
-Los archivos reales de juegos **nunca** se suben al repositorio. Para probar el detector se crean fixtures mínimos en `tests/fixtures/`, como un `Game.ini` escrito a mano o un ejecutable PE vacío. Para pruebas manuales con juegos reales, guárdalos en `games/` (está en `.gitignore`) o fuera del repositorio.
+Los archivos reales de juegos **nunca** se suben al repositorio. Las pruebas generan juegos falsos al vuelo con `make_game` y `make_pe`, así que no hace falta ningún binario. Para pruebas manuales con juegos reales, guárdalos en `games/` (está en `.gitignore`) o fuera del repositorio.
+
+### Pruebas con juegos reales
+
+Son opcionales y en el CI se omiten. Se activan indicando la ruta de tu copia:
+
+```bash
+PTL_POKEMON_Z_PATH="/ruta/a/POKEMON Z V2.19" pytest -m realgame
+```
+
+## Analizar un juego desde la terminal
+
+```bash
+pokemon-to-linux-cli analyze "/ruta/a/POKEMON Z V2.19"          # informe legible
+pokemon-to-linux-cli analyze "/ruta/a/POKEMON Z V2.19" --json   # JSON
+```
+
+Códigos de salida: `0` motor detectado, `1` no detectado, `2` ruta no válida.
 
 ## Integración continua
 
