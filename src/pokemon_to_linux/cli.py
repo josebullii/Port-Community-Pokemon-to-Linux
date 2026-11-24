@@ -73,6 +73,12 @@ def format_report(analysis: GameAnalysis) -> str:
         row("Ejecutable:", "no identificado")
     if "requires_opengl" in det:
         row("OpenGL:", "sí" if det["requires_opengl"] else "no")
+    if deps := det.get("dependencies"):
+        row(
+            "DLL:",
+            f"{len(deps['system'])} de sistema, {len(deps['bundled'])} incluidas, "
+            f"{len(deps['redistributable'])} redistribuibles, {len(deps['missing'])} faltan",
+        )
     row(
         "Ficheros:",
         f"{_format_int(analysis.scan.total_files)} ({_format_size(analysis.scan.total_size)})",

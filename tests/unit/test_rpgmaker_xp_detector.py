@@ -241,6 +241,7 @@ def test_rgss_dll_info(make_game):
         "bits": 32,
         "valid": True,
         "error": None,
+        "imports": [],
     }
     assert info["RGSS102J.dll"]["edition"] == "japonesa"
 
@@ -284,4 +285,58 @@ def test_corrupt_library_dll_is_fine_with_mkxp_z(make_game):
     result = detect(make_game(exe="mkxp-z", dlls=(), extra={"RGSS104E.dll": b"basura"}))
 
     assert result.details["rgss_dll_info"][0]["valid"] is False
+    assert result.warnings == ()
+
+
+# --- Dependencias PE ---------------------------------------------------------
+
+
+def test_dependencies_of_classic_game(make_game):
+    deps = detect(make_game()).details["dependencies"]
+
+    assert deps == {
+        "system": ["kernel32.dll", "user32.dll", "gdi32.dll"],
+        "bundled": [],
+        "redistributable": [],
+        "missing": [],
+    }
+
+
+def test_missing_dependency_warns(make_game, make_pe):
+    exe = make_pe(imports=("kernel32.dll", "fmod.dll"))
+    result = detect(make_game(exe=None, extra={"Game.exe": exe}))
+
+    assert result.details["dependencies"]["missing"] == ["fmod.dll"]
+    assert any("fmod.dll" in w and "no arrancará" in w for w in result.warnings)
+
+
+def test_bundled_dependency_is_fine(make_game, make_pe):
+    exe = make_pe(imports=("kernel32.dll", "fmod.dll"))
+    result = detect(make_game(exe=None, extra={"Game.exe": exe, "fmod.dll": make_pe(dll=True)}))
+
+    assert result.details["dependencies"]["bundled"] == ["fmod.dll"]
+    assert result.warnings == ()
+
+
+def test_redistributable_dependency_warns(make_game, make_pe):
+    exe = make_pe(imports=("kernel32.dll", "MSVCP140.dll"))
+    result = detect(make_game(exe=None, extra={"Game.exe": exe}))
+
+    assert result.details["dependencies"]["redistributable"] == ["msvcp140.dll"]
+    assert any("redistribuibles" in w for w in result.warnings)
+
+
+def test_library_dependencies_are_checked_for_classic_runtime(make_game, make_pe):
+    dll = make_pe(dll=True, imports=("kernel32.dll", "rara.dll"))
+    result = detect(make_game(dlls=(), extra={"RGSS104E.dll": dll}))
+
+    assert result.details["library_dependencies"]["missing"] == ["rara.dll"]
+    assert any(w.startswith("RGSS104E.dll necesita") for w in result.warnings)
+
+
+def test_library_dependencies_ignored_with_mkxp_z(make_game, make_pe):
+    dll = make_pe(dll=True, imports=("rara.dll",))
+    result = detect(make_game(exe="mkxp-z", dlls=(), extra={"RGSS104E.dll": dll}))
+
+    assert "library_dependencies" not in result.details
     assert result.warnings == ()

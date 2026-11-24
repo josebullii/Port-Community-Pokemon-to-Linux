@@ -13,6 +13,7 @@ from collections.abc import Callable
 from pathlib import PureWindowsPath
 from typing import Any
 
+from pokemon_to_linux.domain.dependencies import DependencyReport, classify_imports
 from pokemon_to_linux.engines.base import (
     DETECTION_THRESHOLD,
     DetectionResult,
@@ -67,6 +68,20 @@ W_RESOURCES = 0.05
 W_EXECUTABLE = 0.05
 # Indicios en contra (otros motores RPG Maker).
 W_OTHER_ENGINE = -0.30
+
+
+def _warn_dependencies(owner: str, report: DependencyReport, warnings: list[str]) -> None:
+    if report.missing:
+        warnings.append(
+            f"{owner} necesita DLL que no están en la carpeta ni forman parte de Windows: "
+            f"{', '.join(report.missing)}. Sin ellas el juego no arrancará."
+        )
+    if report.redistributable:
+        warnings.append(
+            f"{owner} usa bibliotecas redistribuibles ({', '.join(report.redistributable)}). "
+            "Wine trae versiones propias de muchas; si el juego falla, instala el paquete "
+            "oficial correspondiente (Visual C++, DirectX…)."
+        )
 
 
 class RPGMakerXPDetector(EngineDetector):
@@ -180,8 +195,11 @@ class RPGMakerXPDetector(EngineDetector):
             details["rgss_library_version"] = lib_version["version"]
 
         # Solo importa si el runtime carga la DLL (mkxp-z no la usa).
-        if library and RGSS1_DLL.match(lib_name) and runtime not in MKXP_RUNTIMES:
-            lib_info = next((i for i in dll_infos if i["path"] == lib_rel), None)
+        loads_library = bool(library and RGSS1_DLL.match(lib_name)) and (
+            runtime not in MKXP_RUNTIMES
+        )
+        lib_info = next((i for i in dll_infos if i["path"] == lib_rel), None)
+        if loads_library:
             exe_arch = details.get("architecture")
             if lib_info is None:
                 warnings.append(
@@ -194,6 +212,17 @@ class RPGMakerXPDetector(EngineDetector):
                     f"{lib_info['name']} es {lib_info['architecture']} y {executable} es "
                     f"{exe_arch}: no pueden funcionar juntos."
                 )
+
+        # --- Dependencias PE (DLL importadas) -------------------------------
+        local_dlls = scan.files_with_suffix(".dll")
+        if executable is not None and "imports" in details:
+            report = classify_imports(details["imports"], local_dlls)
+            details["dependencies"] = report.to_dict()
+            _warn_dependencies(executable, report, warnings)
+        if loads_library and lib_info is not None and lib_info["valid"]:
+            report = classify_imports(lib_info["imports"], local_dlls)
+            details["library_dependencies"] = report.to_dict()
+            _warn_dependencies(lib_info["name"], report, warnings)
 
         confidence = max(0.0, min(1.0, sum(e.weight for e in evidence)))
         detected = confidence >= DETECTION_THRESHOLD and xp_specific
@@ -234,6 +263,7 @@ class RPGMakerXPDetector(EngineDetector):
             return info
         info.update(architecture=pe.machine, bits=pe.bits, valid=pe.is_dll)
         info["error"] = None if pe.is_dll else "es un ejecutable, no una DLL"
+        info["imports"] = list(pe.imports)
         return info
 
     @staticmethod

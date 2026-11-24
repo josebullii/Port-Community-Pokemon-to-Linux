@@ -39,4 +39,9 @@ def test_pokemon_z_v2_19_diagnosis():
     assert details["mkxp_config"] is True
     assert details["preload_script"] is True
     assert details["rxdata_files"] > 500
+    assert details["rgss_library_version"] == "1.04"
+    assert all(i["valid"] and i["architecture"] == "i386" for i in details["rgss_dll_info"])
+    assert "opengl32.dll" in details["dependencies"]["system"]
+    assert details["dependencies"]["missing"] == []
+    assert details["dependencies"]["redistributable"] == []
     assert analysis.warnings == ()

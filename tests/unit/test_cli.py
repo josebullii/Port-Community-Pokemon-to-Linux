@@ -16,6 +16,7 @@ def test_analyze_text_report(make_game, capsys):
     assert "RGSS:        RGSS104E.dll (versión 1.04, i386)" in out
     assert "Game.exe (i386, 32 bits, gui)" in out
     assert "OpenGL:      sí" in out
+    assert "DLL:         2 de sistema, 0 incluidas, 0 redistribuibles, 0 faltan" in out
     assert "(ninguna)" in out
 
 
