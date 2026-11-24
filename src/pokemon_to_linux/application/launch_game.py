@@ -91,6 +91,9 @@ def prepare_launch(
     if created and bits in (32, 64):
         test_result = prefixes.run_test_program(prefix, bits)
         if not test_result.ok:
+            # Si se quedara, el siguiente intento lo reutilizaría sin comprobarlo
+            # y el juego fallaría con un error críptico de Wine.
+            prefixes.delete(game_id)
             hint = MISSING_32_BIT_HINT if bits == 32 else "Revisa la instalación de Wine."
             raise LaunchError(
                 f"El prefijo {game_id} no puede ejecutar programas de {bits} bits. {hint}"

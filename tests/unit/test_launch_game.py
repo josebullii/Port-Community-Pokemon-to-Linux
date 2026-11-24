@@ -74,6 +74,23 @@ def test_missing_32_bit_support_gives_clear_error(make_game, prefixes):
     assert MISSING_32_BIT_HINT in str(exc.value)
 
 
+def test_failed_check_removes_prefix_so_next_attempt_checks_again(make_game, prefixes):
+    """Regresión: el prefijo que no superaba la comprobación se reutilizaba sin comprobar."""
+    game = make_game(exe="runnable")
+    fake = FakeWine(program_code=1)
+
+    for _ in range(2):  # el segundo intento debe fallar igual, no lanzar el juego
+        with pytest.raises(LaunchError, match="32 bits"):
+            prepare_launch(game, wine=WINE, prefixes=pm(prefixes, fake))
+        assert not (prefixes / "juego-de-prueba").exists()
+
+    # Con Wine ya arreglado, el siguiente intento crea y comprueba un prefijo nuevo.
+    fake.program_code = 42
+    plan = prepare_launch(game, wine=WINE, prefixes=pm(prefixes, fake))
+    assert plan.prefix_created is True
+    assert plan.test_result.ok
+
+
 def test_unknown_engine_is_rejected(tmp_path, prefixes):
     with pytest.raises(LaunchError, match="motor"):
         prepare_launch(tmp_path, wine=WINE, prefixes=pm(prefixes, FakeWine()))
