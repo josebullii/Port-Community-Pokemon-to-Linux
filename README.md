@@ -1,5 +1,8 @@
 # Pokémon to Linux
 
+[![CI](https://github.com/josebullii/Port-Community-Pokemon-to-Linux/actions/workflows/ci.yml/badge.svg)](https://github.com/josebullii/Port-Community-Pokemon-to-Linux/actions/workflows/ci.yml)
+[![Licencia: GPL v3+](https://img.shields.io/badge/licencia-GPL--3.0--or--later-blue.svg)](LICENSE)
+
 Lanzador y gestor de compatibilidad para ejecutar en Linux **fangames de Pokémon creados para Windows**, empezando por **Pokémon Z** (RPG Maker XP / Pokémon Essentials). El objetivo final es que también funcionen en consolas portátiles Linux como la **Anbernic R36S**.
 
 > **Estado:** sprint 1 (fundación) completado: la aplicación arranca con ventana, logging y pruebas base. Aún no analiza ni lanza juegos.
@@ -86,8 +89,9 @@ Arquitectura modular por capas. La interfaz nunca invoca Wine directamente: pide
 ### Estructura del repositorio (prevista)
 
 ```
-port_pokemons/
+Port-Community-Pokemon-to-Linux/
 ├── pyproject.toml, README.md, LICENSE, .gitignore
+├── .github/workflows/ci.yml
 ├── src/pokemon_to_linux/
 │   ├── main.py, config.py
 │   ├── ui/              # main_window, library_page, add_game_dialog, settings
@@ -183,15 +187,26 @@ La interfaz muestra estados precisos: *no analizado, detectado, configurado, pro
 ### Requisitos
 
 - Linux x86_64 (para la vía Wine)
-- Python 3.12
-- Wine (instalado desde los repositorios de tu distribución)
+- Python 3.12 o superior
+- Bibliotecas X11 que necesita Qt 6
 - Git
+- Wine, solo a partir del sprint 3. Se instala desde los repositorios de tu distribución.
+
+En Debian / Ubuntu:
+
+```bash
+sudo apt install python3 python3-venv python3-pip \
+  libegl1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
+  libxcb-keysyms1 libxcb-render-util0 libxcb-shape0 libxcb-xkb1
+```
+
+Los comandos para Fedora y Arch, y la solución al error *"Could not load the Qt platform plugin xcb"*, están en [docs/development.md](docs/development.md).
 
 ### Puesta en marcha
 
 ```bash
-git clone <url-del-repo> port_pokemons
-cd port_pokemons
+git clone https://github.com/josebullii/Port-Community-Pokemon-to-Linux.git
+cd Port-Community-Pokemon-to-Linux
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -213,6 +228,14 @@ pytest
 ruff check .
 ruff format .
 ```
+
+La [integración continua](.github/workflows/ci.yml) ejecuta en cada push Ruff, pytest, un arranque real de la aplicación y la construcción del paquete en **Ubuntu 24.04 con Python 3.12 y 3.13**.
+
+### Documentación
+
+- [Arquitectura](docs/architecture.md): capas, módulos y rutas
+- [Compatibilidad](docs/compatibility.md): matriz de pruebas y ficha de Pokémon Z
+- [Desarrollo](docs/development.md): requisitos, pruebas, CI y convenciones
 
 | Nivel | Qué cubre |
 |---|---|

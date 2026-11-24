@@ -30,7 +30,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     from pokemon_to_linux.ui.main_window import MainWindow
 
-    app = QApplication(argv)
+    # Reutiliza la instancia si ya existe (Qt solo admite una por proceso).
+    app = QApplication.instance() or QApplication(argv)
     app.setApplicationName(APP_ID)
     app.setApplicationDisplayName(APP_NAME)
     app.setApplicationVersion(__version__)
