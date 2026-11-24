@@ -45,6 +45,7 @@ testpaths = ["tests"]
 addopts = "-ra"
 markers = [
     "integration: pruebas que levantan Qt u otros componentes reales",
+    "realgame: pruebas con juegos reales; requieren variables PTL_*_PATH",
 ]
 
 [tool.ruff]

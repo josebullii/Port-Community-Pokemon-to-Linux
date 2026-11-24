@@ -31,10 +31,48 @@
 
 ## Ficha de Pokémon Z v2.19
 
+### Diagnóstico automático (sprint 2)
+
+```
+$ pokemon-to-linux-cli analyze "POKEMON Z V2.19"
+Pokémon to Linux · diagnóstico
+
+  Carpeta:     …/POKEMON Z V2.19
+  Título:      Pokemon Z
+  Motor:       RPG Maker XP (detectado, confianza 100%)
+  Runtime:     mkxp-z (SDL2 2.0.12)
+  Ejecutable:  Game.exe (i386, 32 bits, gui)
+  OpenGL:      sí
+  Ficheros:    19.070 (873,5 MB)
+
+  Indicios:
+    +0.10  Game.ini con sección [Game]
+    +0.25  Library=RGSS104E.dll (RGSS1)
+    +0.15  Scripts=Data\Scripts.rxdata
+    +0.15  RGSS102E.dll, RGSS102J.dll, RGSS104E.dll
+    +0.25  526 ficheros .rxdata en Data/
+    +0.05  carpetas Graphics/ y Audio/
+    +0.05  Game.exe (i386, 32 bits)
+    +0.00  Game.exe es mkxp-z
+
+  Advertencias:
+    (ninguna)
+```
+
+Mismo resultado en Windows 11 y en Ubuntu 24.04. La prueba `tests/integration/test_real_games.py` lo verifica cuando se define `PTL_POKEMON_Z_PATH`.
+
+**Qué significa para el sprint 3 (Wine):**
+- **El ejecutable es de 32 bits (i386).** El prefijo Wine tiene que poder ejecutar binarios win32, sea un prefijo win32 o uno WoW64.
+- **`Game.exe` importa `OPENGL32.DLL`.** El sistema necesita OpenGL funcional, también en 32 bits si Wine no usa WoW64.
+- **SDL2 va enlazado dentro de `Game.exe`.** No hay que buscar `SDL2.dll`.
+- **No hace falta ningún RTP** (`RTP1`, `RTP2` y `RTP3` están vacíos).
+
+### Contenido de la carpeta
+
 Datos obtenidos al analizar los archivos del juego:
 
 - `Game.ini`: `Library=RGSS104E.dll`, `Scripts=Data\Scripts.rxdata`, `Title=Pokemon Z`
-- `Game.exe`: mkxp-z (PE32 i386). Hay una copia en `Data/Game.exe`.
+- `Game.exe`: mkxp-z (PE32 i386, interfaz gráfica). Importa 16 DLL de sistema, entre ellas `OPENGL32.DLL`. Hay una copia idéntica en `Data/Game.exe`.
 - DLL presentes: `RGSS102E.dll`, `RGSS102J.dll`, `RGSS104E.dll`, `fluidsynth.dll`, `gif.dll`, `KleinBitmap.dll`, `rgssdisp.dll`, `rubyscreen.dll`
 - Configuración de mkxp-z: `mkxp.json` (`vsync: false`, `enableBlitting: true`…) y `preload.rb` (parche de Zlib)
 - `Editor.ini` apunta a `RGSS102E.dll` y `EditorScripts.rxdata`, el editor de Pokémon Essentials. No es el juego.

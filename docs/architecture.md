@@ -28,12 +28,48 @@ Pokémon to Linux es un lanzador y gestor de compatibilidad. No reescribe los ju
 | `config.py` | `AppPaths`: rutas XDG de la app (datos, config, caché, estado, prefijos, BD, logs) | 1 ✅ |
 | `infrastructure/logging/` | Log rotativo en fichero + consola, `excepthook` global | 1 ✅ |
 | `ui/main_window.py` | Ventana principal: Biblioteca, Diagnóstico, Acerca de | 1 ✅ |
-| `infrastructure/filesystem/` | `GameScanner`: inventario de la carpeta de un juego | 2 |
-| `engines/` | `EngineDetector` base + `rpgmaker_xp/` (RGSS1, mkxp-z) | 2 |
+| `infrastructure/filesystem/game_scanner.py` | `GameScanner`: inventario de la carpeta. Búsquedas sin distinguir mayúsculas, sin seguir enlaces simbólicos y con límite de ficheros | 2 ✅ |
+| `infrastructure/filesystem/ini_reader.py` | Lectura de `Game.ini`: detecta UTF-8, Shift-JIS o cp1252 y normaliza claves | 2 ✅ |
+| `infrastructure/filesystem/pe_inspector.py` | Cabeceras PE: arquitectura, 32/64 bits, DLL importadas y marcadores binarios | 2 ✅ |
+| `engines/base.py`, `engines/detector.py` | Contrato `EngineDetector` y `DetectionResult`. `detect_engine` elige el mejor resultado | 2 ✅ |
+| `engines/rpgmaker_xp/` | `RPGMakerXPDetector`: indicios con peso, runtime (mkxp-z, mkxp, rgss1) y advertencias | 2 ✅ |
+| `application/analyze_game.py` | Caso de uso `analyze_game`: escaneo, detección y advertencias | 2 ✅ |
+| `cli.py` | `pokemon-to-linux-cli analyze <carpeta> [--json]` | 2 ✅ |
 | `infrastructure/wine/` | `WineManager`, `PrefixManager`, `ProcessManager` (`QProcess`) | 3 |
 | `domain/` | Entidades `Game`, `Engine`, `Profile`, estado de compatibilidad | 4 |
 | `infrastructure/database/` | Conexión SQLite y repositorios | 5 |
-| `application/` | Casos de uso que orquestan todo lo anterior | 5 |
+| `application/` (resto) | Casos de uso para añadir, configurar, lanzar y detener juegos | 3-5 |
+
+## Detección de motor (sprint 2)
+
+```
+carpeta ──► GameScanner ──► GameScan ──► detect_engine ──► DetectionResult
+                                          │
+                                          └─ RPGMakerXPDetector (+ futuros detectores)
+```
+
+`RPGMakerXPDetector` suma indicios con peso. El máximo es 1.0:
+
+| Indicio | Peso |
+|---|---|
+| `Game.ini` con sección `[Game]` | +0.10 |
+| `Library=` apunta a una DLL RGSS1 (`RGSS1xx*.dll`) | +0.25 |
+| `Scripts=` apunta a un `.rxdata` | +0.15 |
+| DLL RGSS1 presente en la carpeta | +0.15 |
+| `Data/*.rxdata` o `Game.rgssad` | +0.25 |
+| `Graphics/` y `Audio/` | +0.05 |
+| Ejecutable PE válido | +0.05 |
+| Indicios de VX o VX Ace (RGSS2/3, `.rvdata`, `.rvdata2`, `.rgss2a`, `.rgss3a`) | −0.30 |
+
+Un juego se considera **detectado** si la confianza llega a 0.5 **y** hay al menos un indicio propio de XP: `.rxdata`, `.rgssad` o RGSS1 en el INI. Así, un `Game.exe` por sí solo nunca basta.
+
+El runtime se identifica buscando marcadores dentro del ejecutable:
+- `mkxp-z` → **mkxp-z**
+- `mkxp` → **mkxp**
+- ninguno de los dos, pero hay DLL RGSS1 → **rgss1**
+- en cualquier otro caso → **unknown**
+
+Con mkxp-z no se avisa de que falte la DLL indicada en `Library=`, porque no la usa.
 
 ## Rutas en tiempo de ejecución (XDG)
 
