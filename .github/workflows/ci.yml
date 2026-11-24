@@ -37,8 +37,13 @@ jobs:
       - name: Bibliotecas del sistema para Qt
         run: |
           sudo apt-get update
+          # Base de Qt (modo offscreen) + bibliotecas X11 del plugin xcb
+          # (misma lista que en README.md y docs/development.md) + Xvfb.
           sudo apt-get install -y --no-install-recommends \
-            libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3 libglib2.0-0t64
+            libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3 libglib2.0-0t64 \
+            libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
+            libxcb-keysyms1 libxcb-render-util0 libxcb-shape0 libxcb-xkb1 \
+            xvfb xauth
 
       - name: Instalar el proyecto
         run: python -m pip install -e ".[dev]"
@@ -61,6 +66,27 @@ jobs:
             exit 1
           fi
           grep -q "Iniciando" ~/.local/state/pokemon-to-linux/logs/pokemon-to-linux.log
+
+      - name: Bibliotecas X11 completas
+        run: |
+          plugin=$(python -c "import pathlib, PySide6; print(pathlib.Path(PySide6.__file__).parent / 'Qt/plugins/platforms/libqxcb.so')")
+          missing=$(ldd "$plugin" | grep "not found" || true)
+          if [ -n "$missing" ]; then
+            echo "Faltan bibliotecas para el plugin xcb (actualiza README y docs/development.md):"
+            echo "$missing"
+            exit 1
+          fi
+
+      - name: La aplicación arranca en X11 (Xvfb)
+        env:
+          QT_QPA_PLATFORM: xcb
+        run: |
+          code=0
+          xvfb-run -a timeout 5 pokemon-to-linux || code=$?
+          if [ "$code" -ne 124 ]; then
+            echo "La aplicación no se mantuvo abierta en X11 (código $code)"
+            exit 1
+          fi
 
       - name: Construir el paquete
         run: python -m pip wheel . --no-deps -w dist
