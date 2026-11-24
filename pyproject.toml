@@ -34,6 +34,9 @@ dev = [
 [project.gui-scripts]
 pokemon-to-linux = "pokemon_to_linux.main:main"
 
+[project.scripts]
+pokemon-to-linux-cli = "pokemon_to_linux.cli:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/pokemon_to_linux"]
 
