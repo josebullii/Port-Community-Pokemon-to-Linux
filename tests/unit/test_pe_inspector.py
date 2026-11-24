@@ -7,6 +7,7 @@ from pokemon_to_linux.infrastructure.filesystem.pe_inspector import (
     find_markers,
     inspect_pe,
     parse_pe,
+    read_binary,
 )
 
 
@@ -90,3 +91,21 @@ def test_find_markers(make_pe):
     )
 
     assert found == {"mkxp_z": "mkxp-z", "sdl2": "2.0.12"}
+
+
+def test_unknown_optional_header_raises(make_pe):
+    import struct
+
+    data = bytearray(make_pe())
+    struct.pack_into("<H", data, 0x40 + 4 + 20, 0x1234)  # magic de la cabecera opcional
+
+    with pytest.raises(NotPEError, match="cabecera opcional desconocida"):
+        parse_pe(bytes(data))
+
+
+def test_file_too_big_raises(tmp_path, make_pe):
+    path = tmp_path / "Game.exe"
+    path.write_bytes(make_pe())
+
+    with pytest.raises(NotPEError, match="demasiado grande"):
+        read_binary(path, max_bytes=100)

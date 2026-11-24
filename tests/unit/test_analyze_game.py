@@ -50,3 +50,19 @@ def test_invalid_path_raises(tmp_path):
 def test_engine_display_name():
     assert engine_display_name("rpgmaker_xp") == "RPG Maker XP"
     assert engine_display_name("otro") == "Desconocido"
+
+
+def test_unreadable_warning(make_game, monkeypatch):
+    from pathlib import Path
+
+    real_scandir = os.scandir
+
+    def fake_scandir(path):
+        if Path(path).name == "Audio":
+            raise PermissionError(13, "Permiso denegado")
+        return real_scandir(path)
+
+    monkeypatch.setattr(os, "scandir", fake_scandir)
+    analysis = analyze_game(make_game())
+
+    assert any("No se han podido leer" in w and "Audio/" in w for w in analysis.warnings)

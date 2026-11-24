@@ -340,3 +340,21 @@ def test_library_dependencies_ignored_with_mkxp_z(make_game, make_pe):
 
     assert "library_dependencies" not in result.details
     assert result.warnings == ()
+
+
+# --- Ramas poco frecuentes ---------------------------------------------------
+
+
+def test_executable_that_is_a_dll_warns(make_game, make_pe):
+    result = detect(make_game(exe=None, extra={"Game.exe": make_pe(dll=True)}))
+
+    assert any("es una DLL, no un programa" in w for w in result.warnings)
+
+
+def test_original_mkxp_runtime(make_game, make_pe):
+    exe = make_pe(payload=b"\0mkxp\0")
+    result = detect(make_game(exe=None, dlls=(), extra={"Game.exe": exe}))
+
+    assert result.runtime == "mkxp"
+    # mkxp tampoco carga la DLL RGSS: no se avisa de que falte.
+    assert not any("DLL" in w for w in result.warnings)

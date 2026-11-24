@@ -4,6 +4,13 @@ import pytest
 
 from pokemon_to_linux import __version__
 from pokemon_to_linux.cli import EXIT_DETECTED, EXIT_ERROR, EXIT_NOT_DETECTED, main
+from pokemon_to_linux.infrastructure.logging.logger import LOG_FILE_NAME, ROOT_LOGGER_NAME
+
+
+@pytest.fixture(autouse=True)
+def _isolated_logs(xdg_tmp):
+    """La CLI escribe el log de la app: que vaya a un directorio temporal."""
+    return xdg_tmp
 
 
 def test_analyze_text_report(make_game, capsys):
@@ -75,3 +82,38 @@ def test_command_is_required(capsys):
         main([])
 
     assert exc.value.code == 2
+
+
+def test_analysis_is_written_to_app_log(make_game, xdg_tmp):
+    import logging
+
+    main(["analyze", str(make_game())])
+    for handler in logging.getLogger(ROOT_LOGGER_NAME).handlers:
+        handler.flush()
+
+    log = (xdg_tmp / "state" / "pokemon-to-linux" / "logs" / LOG_FILE_NAME).read_text("utf-8")
+    assert "Análisis de" in log
+    assert "motor=rpgmaker_xp detectado=True" in log
+
+
+def test_cli_works_when_log_cannot_be_written(make_game, capsys, monkeypatch):
+    def broken(*_args, **_kwargs):
+        raise PermissionError(13, "Permiso denegado")
+
+    monkeypatch.setattr("pokemon_to_linux.cli.setup_logging", broken)
+
+    assert main(["analyze", str(make_game())]) == EXIT_DETECTED
+    assert "no se puede escribir el log" in capsys.readouterr().err
+
+
+def test_rgss_line_matches_library_in_subfolder(make_game, make_pe, capsys):
+    from conftest import build_game_ini
+
+    game = make_game(
+        ini=build_game_ini(library=r"System\RGSS104E.dll"),
+        dlls=(),
+        extra={"System/RGSS104E.dll": make_pe(dll=True)},
+    )
+    main(["analyze", str(game)])
+
+    assert r"RGSS:        System\RGSS104E.dll (versión 1.04, i386)" in capsys.readouterr().out

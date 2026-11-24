@@ -11,6 +11,7 @@ import argparse
 import json
 import sys
 from collections.abc import Sequence
+from pathlib import PureWindowsPath
 from typing import TextIO
 
 from pokemon_to_linux import APP_NAME, __version__
@@ -20,6 +21,10 @@ from pokemon_to_linux.application.analyze_game import (
     analyze_game,
     engine_display_name,
 )
+from pokemon_to_linux.config import AppPaths
+from pokemon_to_linux.infrastructure.logging.logger import get_logger, setup_logging
+
+log = get_logger(__name__)
 
 EXIT_DETECTED = 0
 EXIT_NOT_DETECTED = 1
@@ -59,9 +64,8 @@ def format_report(analysis: GameAnalysis) -> str:
     row("Runtime:", runtime)
     if det.get("rgss_library_version"):
         lib = det["ini_library"]
-        info = next(
-            (i for i in det.get("rgss_dll_info", []) if i["name"].lower() in lib.lower()), {}
-        )
+        lib_name = PureWindowsPath(lib).name.lower()
+        info = next((i for i in det.get("rgss_dll_info", []) if i["name"].lower() == lib_name), {})
         extra = f", {info['architecture']}" if info.get("architecture") else ""
         row("RGSS:", f"{lib} (versión {det['rgss_library_version']}{extra})")
     if d.executable:
@@ -118,9 +122,21 @@ def _ensure_utf8(stream: TextIO) -> None:
         stream.reconfigure(encoding="utf-8", errors="replace")
 
 
+def _setup_file_logging() -> None:
+    """Mismo fichero de log que la interfaz gráfica, sin ensuciar la consola.
+
+    Si no se puede crear (permisos, disco lleno…), la CLI sigue funcionando.
+    """
+    try:
+        setup_logging(AppPaths.from_environment().log_dir, console=False)
+    except OSError as exc:
+        print(f"Aviso: no se puede escribir el log ({exc})", file=sys.stderr)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     _ensure_utf8(sys.stdout)
+    _setup_file_logging()
 
     if args.command == "analyze":
         try:
