@@ -36,10 +36,14 @@ Pokémon to Linux es un lanzador y gestor de compatibilidad. No reescribe los ju
 | `engines/rpgmaker_xp/` | `RPGMakerXPDetector`: indicios con peso, runtime (mkxp-z, mkxp, rgss1) y advertencias | 2 ✅ |
 | `application/analyze_game.py` | Caso de uso `analyze_game`: escaneo, detección y advertencias | 2 ✅ |
 | `cli.py` | `pokemon-to-linux-cli analyze <carpeta> [--json]` | 2 ✅ |
-| `infrastructure/wine/` | `WineManager`, `PrefixManager`, `ProcessManager` (`QProcess`) | 3 |
+| `infrastructure/wine/wine_manager.py` | `WineManager`: localiza Wine (PATH, `/usr/lib/wine`, `/opt/wine-*`), su versión y `wineserver`. `wine_environment` prepara el entorno | 3 ✅ |
+| `infrastructure/wine/prefix_manager.py` | `PrefixManager`: un prefijo por juego. Lo crea, reutiliza, prueba y borra | 3 ✅ |
+| `infrastructure/wine/process_manager.py` | `GameProcess` y `ProcessManager`: QProcess, salida línea a línea, log por lanzamiento y cierre ordenado | 3 ✅ |
+| `infrastructure/wine/test_program.py` | Genera un `.exe` mínimo real (32 o 64 bits) que termina con un código dado | 3 ✅ |
+| `application/launch_game.py` | `prepare_launch`, `launch_game` y `stop_game` | 3 ✅ |
 | `domain/` | Entidades `Game`, `Engine`, `Profile`, estado de compatibilidad | 4 |
 | `infrastructure/database/` | Conexión SQLite y repositorios | 5 |
-| `application/` (resto) | Casos de uso para añadir, configurar, lanzar y detener juegos | 3-5 |
+| `application/` (resto) | Casos de uso para añadir y configurar juegos | 4-5 |
 
 ## Detección de motor (sprint 2)
 
@@ -115,6 +119,34 @@ Se respetan `XDG_DATA_HOME`, `XDG_CONFIG_HOME`, `XDG_CACHE_HOME` y `XDG_STATE_HO
 | mkxp-z nativo | Linux ARM64 (R36S) y x86_64 | Después del MVP |
 
 Pokémon Z v2.19 ya incluye mkxp-z como `Game.exe`, junto con `mkxp.json` y `preload.rb`. Ver [compatibility.md](compatibility.md).
+
+## Integración con Wine (sprint 3)
+
+```
+prepare_launch(carpeta)
+  ├─ analyze_game            → ejecutable, bits (sprint 2)
+  ├─ resolve_arch            → win64 (por defecto) o win32
+  ├─ PrefixManager.ensure    → prefixes/<id>   (wineboot --init + wineserver -w)
+  ├─ run_test_program        → solo si el prefijo es nuevo: ¿ejecuta N bits?
+  └─ LaunchSpec              → wine Game.exe, WINEPREFIX…, stop = wineserver -k
+launch_game(plan) → ProcessManager → GameProcess (QProcess) → log por lanzamiento
+```
+
+Decisiones, comprobadas con Wine 9.0 en Ubuntu 24.04:
+
+| Decisión | Motivo |
+|---|---|
+| **Prefijo win64 por defecto, también para juegos de 32 bits** | Con soporte de 32 bits, win64 (WoW64) ejecuta 32 y 64 bits. Los Wine solo-WoW64 ya no crean prefijos win32. win32 queda como opción (`--arch win32`) y se rechaza para ejecutables de 64 bits. |
+| **El soporte de 32 bits se prueba, no se deduce** | Que existan los paquetes no garantiza nada: `wine64` sin `wine32` ejecuta 64 bits pero falla con 32 (`syswow64\ntdll.dll` no encontrado). Por eso se ejecuta un programa de prueba real. |
+| **`wineserver -w` tras `wineboot --init`** | `wineboot` termina antes de que `system.reg` esté en disco. |
+| **Parar con `wineserver -k`** | El juego no es hijo directo del proceso `wine`. Terminar `wine` no lo cierra; `wineserver -k` cierra todo el prefijo. Si no basta, se fuerza el cierre tras 5 s. |
+| **`WINEDLLOVERRIDES=mscoree=;mshtml=`** | Evita que Wine ofrezca instalar Mono o Gecko con ventanas emergentes. |
+| **Se descartan los `WINE*` del entorno del usuario** | Un `WINEPREFIX` o un `WINEARCH` propios no deben mezclarse con el prefijo del juego. |
+| **Nunca se recrea ni se borra un prefijo sin pedirlo** | `ensure` falla si el prefijo existe con otra arquitectura. `delete` no sigue enlaces simbólicos. |
+
+### Programa de prueba
+
+`test_program.py` genera byte a byte un ejecutable PE real de 32 o 64 bits que solo llama a `kernel32!ExitProcess(código)`. Así se puede comprobar Wine y probar el lanzador de extremo a extremo sin compiladores, sin binarios en el repositorio y sin juegos con copyright.
 
 ## Principios
 

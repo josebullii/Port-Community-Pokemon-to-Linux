@@ -29,6 +29,18 @@
 | Pokémon Z | 2.19 | RPG Maker XP · mkxp-z (SDL2 2.0.12) | Wine | — | x86_64 | — | — | ⬜ | — | Sprint 4 |
 | Pokémon Z | 2.19 | RPG Maker XP · mkxp-z | mkxp-z nativo | ArkOS (R36S) | aarch64 | — | n/a | ⬜ | — | Después del MVP |
 
+## Entornos Wine probados (programa de prueba)
+
+Resultado de ejecutar el programa de prueba (`test_program.py`), que debe terminar con código 42:
+
+| Distro | Wine | Paquetes | Prefijo | 64 bits | 32 bits |
+|---|---|---|---|---|---|
+| Ubuntu 24.04 | 9.0 (Ubuntu 9.0~repack-4build3) | `wine64` solo | win64 | ✅ | ❌ `syswow64\ntdll.dll` no encontrado |
+| Ubuntu 24.04 | 9.0 (Ubuntu 9.0~repack-4build3) | `wine wine64 wine32:i386` | win64 | ✅ | ✅ |
+| Ubuntu 24.04 | 9.0 (Ubuntu 9.0~repack-4build3) | `wine wine64 wine32:i386` | win32 | ❌ (esperado) | ✅ |
+
+Por tanto, **con Pokémon Z (i386) hace falta `wine32:i386` en Debian/Ubuntu**. Se comprueba con `pokemon-to-linux-cli wine --probe`.
+
 ## Ficha de Pokémon Z v2.19
 
 ### Diagnóstico automático (sprint 2)
