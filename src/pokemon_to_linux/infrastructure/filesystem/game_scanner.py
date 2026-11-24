@@ -2,7 +2,7 @@
 
 El escáner solo lee metadatos (nombres, tamaños); no abre ficheros. Reglas:
 
-- no sigue enlaces simbólicos (se anotan y se omiten);
+- no sigue enlaces simbólicos ni junctions de NTFS (se anotan y se omiten);
 - se detiene al llegar a ``max_files`` y marca el resultado como truncado;
 - las búsquedas por nombre no distinguen mayúsculas, porque los juegos de
   Windows mezclan ``Data/`` y ``data/`` y en Linux eso importa.
@@ -125,7 +125,9 @@ class GameScanner:
 
             for entry in entries:
                 rel = f"{rel_dir}{entry.name}"
-                if entry.is_symlink():
+                # Las junctions de NTFS no son symlinks para Python, pero también
+                # pueden apuntar fuera de la carpeta del juego.
+                if entry.is_symlink() or entry.is_junction():
                     symlinks.append(rel)
                     continue
                 try:
@@ -137,10 +139,12 @@ class GameScanner:
                         if len(relative_files) >= self.max_files:
                             truncated = True
                             break
+                        # stat() primero: si falla, el fichero no entra en el inventario.
+                        size = entry.stat(follow_symlinks=False).st_size
                         if not rel_dir:
                             top_files.append(entry.name)
                         relative_files.append(rel)
-                        total_size += entry.stat(follow_symlinks=False).st_size
+                        total_size += size
                         extensions[os.path.splitext(entry.name)[1].lower()] += 1
                 except OSError as exc:
                     unreadable.append(rel)

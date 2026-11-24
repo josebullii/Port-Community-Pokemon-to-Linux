@@ -1,4 +1,6 @@
 import os
+import sys
+from pathlib import Path
 
 import pytest
 
@@ -86,6 +88,63 @@ def test_symlinks_are_skipped(game_dir, tmp_path):
 
     assert scan.skipped_symlinks == ("enlace",)
     assert not any("secreto" in f for f in scan.relative_files)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="las junctions solo existen en Windows")
+def test_windows_junctions_are_skipped(game_dir, tmp_path):
+    import _winapi
+
+    outside = tmp_path / "fuera"
+    outside.mkdir()
+    (outside / "secreto.txt").write_text("no debe aparecer")
+    _winapi.CreateJunction(str(outside), str(game_dir / "enlace"))
+
+    scan = GameScanner().scan(game_dir)
+
+    assert scan.skipped_symlinks == ("enlace",)
+    assert not any("secreto" in f for f in scan.relative_files)
+
+
+def test_unreadable_directory_is_reported(game_dir, monkeypatch):
+    real_scandir = os.scandir
+
+    def fake_scandir(path):
+        if Path(path).name == "Graphics":
+            raise PermissionError(13, "Permiso denegado")
+        return real_scandir(path)
+
+    monkeypatch.setattr(os, "scandir", fake_scandir)
+    scan = GameScanner().scan(game_dir)
+
+    assert scan.unreadable == ("Graphics/",)
+    assert "Data/Scripts.rxdata" in scan.relative_files  # el resto sí se escanea
+
+
+def test_unreadable_file_is_reported(game_dir, monkeypatch):
+    real_scandir = os.scandir
+
+    class BrokenEntry:
+        """DirEntry cuyo stat() falla (fichero borrado o sin permisos)."""
+
+        def __init__(self, entry):
+            self._entry = entry
+            self.name, self.path = entry.name, entry.path
+
+        def __getattr__(self, attr):
+            return getattr(self._entry, attr)
+
+        def stat(self, **_kwargs):
+            raise PermissionError(13, "Permiso denegado")
+
+    def fake_scandir(path):
+        entries = list(real_scandir(path))
+        return [BrokenEntry(e) if e.name == "Game.ini" else e for e in entries]
+
+    monkeypatch.setattr(os, "scandir", fake_scandir)
+    scan = GameScanner().scan(game_dir)
+
+    assert scan.unreadable == ("Game.ini",)
+    assert "Game.ini" not in scan.relative_files
 
 
 def test_nonexistent_path_raises(tmp_path):
