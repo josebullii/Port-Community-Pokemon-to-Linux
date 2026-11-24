@@ -1,0 +1,54 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+*.egg
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Pruebas, cobertura y herramientas
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# --- IDE / SO ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Datos locales de la aplicación ---
+*.sqlite3
+*.db
+*.log
+
+# --- Juegos y recursos con copyright: NUNCA se suben ---
+# Coloca las copias locales de los juegos en games/ (ignorada) o fuera del repo.
+games/
+Inicio PORTS/
+*.exe
+*.dll
+*.rxdata
+*.rvdata
+*.rvdata2
+*.rgssad
+*.rgss2a
+*.rgss3a
+*.lnk
+
+# Los fixtures de tests son la excepción: archivos mínimos creados a mano
+!tests/fixtures/**
+
+# --- Claude Code (configuración local) ---
+.claude/settings.local.json

@@ -2,7 +2,7 @@
 
 Lanzador y gestor de compatibilidad para ejecutar en Linux **fangames de Pokémon creados para Windows**, empezando por **Pokémon Z** (RPG Maker XP / Pokémon Essentials). El objetivo final es que también funcionen en consolas portátiles Linux como la **Anbernic R36S**.
 
-> **Estado:** en planificación (pre-MVP 0.1). Todavía no hay código ejecutable.
+> **Estado:** sprint 1 (fundación) completado: la aplicación arranca con ventana, logging y pruebas base. Aún no analiza ni lanza juegos.
 
 ---
 
@@ -195,8 +195,16 @@ cd port_pokemons
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-pip install pyside6 pytest ruff
+pip install -e ".[dev]"
 ```
+
+### Ejecutar
+
+```bash
+pokemon-to-linux          # o bien: python -m pokemon_to_linux
+```
+
+Los registros se guardan en `~/.local/state/pokemon-to-linux/logs/`.
 
 ### Pruebas y lint
 
@@ -282,4 +290,10 @@ Problemas conocidos de Pokémon Z en PC, según la documentación del propio jue
 
 ## Licencia
 
-Por definir (se añadirá un archivo `LICENSE`).
+Copyright (C) 2026 Jose Pulido Diaz
+
+Este programa es software libre: puedes redistribuirlo y/o modificarlo bajo los términos de la **GNU General Public License** publicada por la Free Software Foundation, ya sea la **versión 3** de la licencia o (a tu elección) cualquier versión posterior (`GPL-3.0-or-later`).
+
+Se distribuye con la esperanza de que sea útil, pero **SIN NINGUNA GARANTÍA**. Consulta el archivo [`LICENSE`](LICENSE) para ver el texto completo.
+
+> La licencia solo cubre el código de este repositorio. Los fangames, sus recursos y los runtimes de terceros (p. ej. mkxp-z, también GPL) tienen sus propias licencias y sus propios autores.
