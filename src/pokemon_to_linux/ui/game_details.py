@@ -63,6 +63,8 @@ ACTIVITY_TEXT = {
 
 
 def format_duration(seconds: float) -> str:
+    if seconds <= 0:
+        return "—"
     minutes = int(seconds // 60)
     if minutes < 1:
         return "menos de 1 min"

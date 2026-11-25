@@ -388,3 +388,12 @@ def test_main_window_asks_before_closing_with_a_game_running(env, qapp, tmp_path
     assert window.close() is True
     assert stopped == [True]
     window.deleteLater()
+
+
+def test_format_duration():
+    from pokemon_to_linux.ui.game_details import format_duration
+
+    assert format_duration(0) == "—"
+    assert format_duration(30) == "menos de 1 min"
+    assert format_duration(125) == "2 min"
+    assert format_duration(3 * 3600 + 5 * 60) == "3 h 05 min"

@@ -42,8 +42,9 @@ win() { xdotool search --name "^${WINDOW}\$" 2>/dev/null | head -1; }
 start_xvfb() {
     pgrep -f "Xvfb ${DISPLAY}( |\$)" >/dev/null && return
     setsid nohup Xvfb "$DISPLAY" -screen 0 "$SIZE" >/dev/null 2>&1 &
+    # No basta con mirar /tmp/.X11-unix: en WSL Xvfb solo usa un socket abstracto.
     for _ in $(seq 1 20); do
-        [ -e "/tmp/.X11-unix/X${DISPLAY#:}" ] && return
+        xdotool getdisplaygeometry >/dev/null 2>&1 && return
         sleep 0.25
     done
     echo "Xvfb no ha arrancado en $DISPLAY" >&2
@@ -63,7 +64,8 @@ start)
     ;;
 gui)
     start_xvfb
-    setsid nohup pokemon-to-linux >"$OUT/gui.txt" 2>&1 </dev/null &
+    # Qt preferiría Wayland si existe (p. ej. WSLg) y la ventana no saldría en Xvfb.
+    QT_QPA_PLATFORM=xcb setsid nohup pokemon-to-linux >"$OUT/gui.txt" 2>&1 </dev/null &
     sleep 4
     echo "interfaz lanzada (salida en $OUT/gui.txt)"
     ;;
