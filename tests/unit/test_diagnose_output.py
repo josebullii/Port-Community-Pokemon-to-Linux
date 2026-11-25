@@ -33,6 +33,26 @@ def test_missing_32_bit_opengl_is_recognized():
     assert finding.to_dict()["id"] == "opengl-sin-formato"
 
 
+# Salida real con WINEDEBUG=fixme-all (sprint 4): Wine dice la causa exacta.
+NO_GL32_WINE_OUTPUT = [
+    "RGSS version 1 (RPG Maker XP) ",
+    "0024:err:wgl:init_opengl Failed to load libGL: libGL.so.1: cannot open shared object "
+    "file: No such file or directory",
+    "0024:err:wgl:init_opengl OpenGL support is disabled.",
+    "0024:err:wgl:set_pixel_format Invalid format 0",
+    "Error creating window: No matching GL pixel format available ",
+]
+
+
+def test_wine_explains_missing_libgl():
+    diagnoser = OutputDiagnoser()
+    diagnoser.feed_all(NO_GL32_WINE_OUTPUT)
+
+    [finding] = diagnoser.findings
+    assert finding.issue.id == "opengl-sin-formato"
+    assert "libGL.so.1: cannot open shared object file" in finding.line
+
+
 def test_working_game_has_no_findings():
     diagnoser = OutputDiagnoser()
     diagnoser.feed_all(OK_OUTPUT)

@@ -73,17 +73,20 @@ def prepare_launch(
     arch: str | None = None,
     extra_env: Mapping[str, str] | None = None,
     profiles: Sequence[GameProfile] = (),
+    analysis: GameAnalysis | None = None,
 ) -> LaunchPlan:
     """Analiza el juego, prepara su prefijo y devuelve todo lo necesario para lanzarlo.
 
     Si algún perfil de ``profiles`` corresponde al juego, se aplica: su
     arquitectura (salvo que se pida otra con ``arch``) y su entorno (que
-    ``extra_env`` puede sobrescribir).
+    ``extra_env`` puede sobrescribir). Si ya se ha analizado el juego, se
+    puede pasar ``analysis`` para no volver a escanear la carpeta.
 
     Puede tardar (crear un prefijo lleva segundos): en la interfaz gráfica
     debe llamarse fuera del hilo principal.
     """
-    analysis = analyze_game(game_path)
+    if analysis is None:
+        analysis = analyze_game(game_path)
     detection = analysis.detection
     if not detection.detected:
         raise LaunchError(

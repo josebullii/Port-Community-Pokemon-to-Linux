@@ -27,7 +27,8 @@ GENERIC_ISSUES = (
             "Suele faltar OpenGL con los bits del juego (de 32 bits para Pokémon Z). "
             + OPENGL_HINTS[32]
         ),
-        output=("No matching GL pixel format available",),
+        # Wine avisa antes que mkxp-z (si WINEDEBUG conserva los err).
+        output=("Failed to load libGL", "No matching GL pixel format available"),
     ),
     KnownIssue(
         id="wine32-falta",
