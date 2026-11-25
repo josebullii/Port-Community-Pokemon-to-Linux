@@ -55,5 +55,10 @@ solution = "Actualiza los drivers gráficos (Mesa o el driver propietario, tambi
 id = "fluidsynth-sin-midi"
 symptom = "fluidsynth.dll no se carga y la música MIDI queda desactivada."
 solution = "No afecta: el juego no trae música MIDI (solo ogg, wav y mp3). fluidsynth.dll necesita libreadline8.dll y libsndfile-1.dll, que el juego no incluye, y en Windows pasa lo mismo."
-output = ["fluidsynth.dll"]
+# Solo los dos mensajes exactos: "fluidsynth.dll" a secas ocultaría también
+# un fallo real dentro de la DLL (p. ej. un page fault en fluidsynth.dll).
+output = [
+    "Failed to load fluidsynth.dll. Midi playback is disabled",
+    'fluidsynth.dll") not found',
+]
 harmless = true

@@ -42,9 +42,14 @@ notes = "Arranca y es jugable con Wine 9.0 en Ubuntu 24.04."
 id = "fluidsynth-sin-midi"
 symptom = "fluidsynth.dll no se carga y la música MIDI queda desactivada."
 solution = "No afecta: el juego no trae música MIDI."
-output = ["fluidsynth.dll"]
+output = [
+    "Failed to load fluidsynth.dll. Midi playback is disabled",
+    'fluidsynth.dll") not found',
+]
 harmless = true
 ```
+
+Con `harmless = true`, los patrones deben ser **los mensajes exactos** y no solo un nombre: `"fluidsynth.dll"` a secas ocultaría también un fallo real dentro de esa DLL.
 
 El perfil completo está en [`pokemon-z.toml`](../src/pokemon_to_linux/profiles/pokemon-z.toml).
 

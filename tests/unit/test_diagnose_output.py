@@ -1,3 +1,5 @@
+import pytest
+
 from pokemon_to_linux.application.diagnose_output import (
     GENERIC_ISSUES,
     MAX_LINE,
@@ -142,6 +144,23 @@ def test_pokemon_z_profile_marks_fluidsynth_as_harmless():
     assert finding.issue.harmless
     assert finding.to_dict()["harmless"] is True
     assert diagnoser.problems == ()
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "wine: Unhandled page fault on read access to 00000000 at address 6A1B2C3D "
+        "(thread 012c), starting debugger... (fluidsynth.dll)",
+        '012c:err:module:import_dll Library fluidsynth.dll (which is needed by L"Z:\\'
+        'juego\\mkxp-z.dll") not found',
+    ],
+)
+def test_pokemon_z_harmless_patterns_do_not_hide_real_failures(line):
+    """Solo los mensajes conocidos de fluidsynth son inofensivos, no cualquier mención."""
+    diagnoser = OutputDiagnoser(pokemon_z())
+    finding = diagnoser.feed(line)
+
+    assert finding is None or not finding.issue.harmless
 
 
 def test_without_profile_the_missing_dll_is_a_problem():
