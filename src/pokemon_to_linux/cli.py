@@ -282,7 +282,15 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     return EXIT_DETECTED if analysis.detection.detected else EXIT_NOT_DETECTED
 
 
-def _check_data(analysis, profile, wine, wine_error, checks, ready) -> dict:
+def _check_data(
+    analysis: GameAnalysis,
+    profile: GameProfile | None,
+    wine: WineInstallation | None,
+    wine_error: str | None,
+    checks: Sequence[RequirementCheck],
+    ready: bool,
+) -> dict[str, object]:
+    """Resultado de ``check`` para ``--json``."""
     detection = analysis.detection
     data = {
         "game_path": str(analysis.path),
