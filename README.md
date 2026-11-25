@@ -5,7 +5,7 @@
 
 Lanzador y gestor de compatibilidad para ejecutar en Linux **fangames de Pokémon creados para Windows**, empezando por **Pokémon Z** (RPG Maker XP / Pokémon Essentials). El objetivo final es que también funcionen en consolas portátiles Linux como la **Anbernic R36S**.
 
-> **Estado:** sprint 3 (Wine) completado. La aplicación diagnostica la carpeta de un juego, detecta Wine, crea un prefijo aislado por juego y lanza el juego con Wine, guardando un log de cada ejecución. Por ahora se hace desde la terminal (`pokemon-to-linux-cli analyze`, `wine` y `run`). El sprint 4 se centra en que Pokémon Z funcione de verdad.
+> **Estado:** sprint 4 completado: **Pokémon Z se ejecuta en Linux con Wine**. Se ha probado en Ubuntu 24.04 (pantalla de título, menús, exploración, guardar y cargar partida). La aplicación reconoce el juego por su perfil de compatibilidad, comprueba que el sistema tiene lo necesario (Wine y OpenGL de 32 bits), lanza el juego en su propio prefijo y explica los problemas conocidos que aparezcan. Por ahora se hace desde la terminal (`pokemon-to-linux-cli check` y `run`). El sprint 5 traerá la biblioteca y la interfaz gráfica completa.
 
 ---
 
@@ -100,12 +100,14 @@ Port-Community-Pokemon-to-Linux/
 │   ├── infrastructure/
 │   │   ├── database/    # connection, repositories
 │   │   ├── wine/        # wine_manager, prefix_manager, process_manager
-│   │   ├── filesystem/  # game_scanner
+│   │   ├── filesystem/  # game_scanner, profile_store
+│   │   ├── system/      # host (bibliotecas, sesión gráfica, montajes)
 │   │   └── logging/     # logger
 │   ├── engines/         # base, detector, rpgmaker_xp/
+│   ├── profiles/        # perfiles de compatibilidad integrados (*.toml)
 │   └── resources/       # icons, styles
 ├── tests/               # unit, integration, fixtures
-└── docs/                # architecture, compatibility, development
+└── docs/                # architecture, compatibility, development, profiles
 ```
 
 ---
@@ -193,7 +195,7 @@ La interfaz muestra estados precisos: *no analizado, detectado, configurado, pro
 - Python 3.12 o superior
 - Bibliotecas X11 que necesita Qt 6
 - Git
-- Wine **con soporte de 32 bits**. Se instala desde los repositorios de tu distribución; ver [docs/development.md](docs/development.md#wine-desde-el-sprint-3).
+- Wine **con soporte de 32 bits** y **OpenGL de 32 bits** (Pokémon Z es un programa de 32 bits que dibuja con OpenGL). Se instalan desde los repositorios de tu distribución; ver [docs/development.md](docs/development.md#wine-desde-el-sprint-3).
 
 En Debian / Ubuntu:
 
@@ -242,12 +244,32 @@ pokemon-to-linux-cli analyze "/ruta/a/POKEMON Z V2.19" --json   # JSON
 
 El informe completo de Pokémon Z está en [docs/compatibility.md](docs/compatibility.md).
 
-### Lanzar un juego con Wine
+### Jugar con Wine
+
+En Debian / Ubuntu, Pokémon Z necesita:
 
 ```bash
-pokemon-to-linux-cli wine --probe            # ¿Wine ejecuta 32 y 64 bits?
-pokemon-to-linux-cli run "/ruta/al/juego"    # prepara el prefijo y lanza el juego
+sudo dpkg --add-architecture i386 && sudo apt update
+sudo apt install wine wine64 wine32:i386 libgl1:i386 libgl1-mesa-dri:i386
 ```
+
+```bash
+pokemon-to-linux-cli check "/ruta/a/POKEMON Z V2.19"   # ¿está todo listo para jugar?
+pokemon-to-linux-cli run "/ruta/a/POKEMON Z V2.19"     # prepara el prefijo y lanza el juego
+```
+
+```
+  Juego:       pokemon-z
+  Perfil:      Pokémon Z · Parcial
+  Ejecutable:  /home/yo/Juegos/POKEMON Z V2.19/Game.exe
+  Prefijo:     ~/.local/share/pokemon-to-linux/prefixes/pokemon-z (win64)
+  Partidas:    ~/.local/share/pokemon-to-linux/prefixes/pokemon-z/drive_c/users/yo/Saved Games/Pokemon Z
+```
+
+- **Requisitos.** `run` comprueba antes la sesión gráfica, OpenGL con los bits del juego y si la carpeta está en un sistema de ficheros lento (p. ej. `/mnt/c` en WSL). Si falta algo imprescindible, explica cómo instalarlo y no lanza el juego.
+- **Perfiles.** El [perfil de Pokémon Z](src/pokemon_to_linux/profiles/pokemon-z.toml) indica la arquitectura del prefijo, dónde guarda las partidas y sus problemas conocidos. Puedes añadir los tuyos en `~/.config/pokemon-to-linux/profiles/` ([formato](docs/profiles.md)).
+- **Partidas.** Con Wine, las partidas quedan **dentro del prefijo del juego**. No lo borres sin copiarlas antes.
+- **Diagnóstico.** Al terminar, `run` explica los problemas reconocidos en la salida del juego (falta OpenGL de 32 bits, wine32, una DLL, el audio…) y cómo resolverlos.
 
 La primera vez se crea el prefijo del juego, lo que tarda unos segundos. Cada ejecución deja un log en `~/.local/state/pokemon-to-linux/logs/games/<id>/`, donde se conservan los 20 últimos. Ctrl+C detiene el juego de forma ordenada, cerrando también sus procesos secundarios.
 
@@ -266,6 +288,7 @@ La [integración continua](.github/workflows/ci.yml) ejecuta en cada push Ruff, 
 - [Arquitectura](docs/architecture.md): capas, módulos y rutas
 - [Compatibilidad](docs/compatibility.md): matriz de pruebas y ficha de Pokémon Z
 - [Desarrollo](docs/development.md): requisitos, pruebas, CI y convenciones
+- [Perfiles](docs/profiles.md): formato de los perfiles de compatibilidad
 
 | Nivel | Qué cubre |
 |---|---|
@@ -286,7 +309,7 @@ Cada prueba registra el juego y su versión, el motor, la distribución, la arqu
 | 1 · Fundación ✅ | Repositorio, `pyproject.toml`, PySide6, ventana, logging, tests base | La aplicación arranca |
 | 2 · Análisis ✅ | Escáner, lectura de `Game.ini`, detector XP/mkxp-z | Diagnóstico de Pokémon Z |
 | 3 · Wine ✅ | WineManager, PrefixManager, QProcess, logs | Juego de prueba lanzado desde Python |
-| 4 · Juego real | Perfil de Pokémon Z, dependencias, pruebas de juego | Pokémon Z se ejecuta por primera vez |
+| 4 · Juego real ✅ | Perfil de Pokémon Z, dependencias, pruebas de juego | Pokémon Z se ejecuta por primera vez |
 | 5 · Biblioteca | SQLite, alta de juegos, biblioteca, detalles, diagnóstico | Lanzador completo de principio a fin |
 | 6 · Estabilización | Cierres, fallos, documentación, versión 0.1 | MVP listo para pruebas de la comunidad |
 
