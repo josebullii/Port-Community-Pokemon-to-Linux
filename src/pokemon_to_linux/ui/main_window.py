@@ -19,7 +19,9 @@ from PySide6.QtWidgets import (
 )
 
 from pokemon_to_linux import APP_NAME, __version__
+from pokemon_to_linux.application.check_requirements import check_system_opengl
 from pokemon_to_linux.config import AppPaths
+from pokemon_to_linux.domain.requirements import CheckStatus
 from pokemon_to_linux.infrastructure.wine.wine_manager import WineError, WineManager
 
 
@@ -32,6 +34,30 @@ def wine_status() -> str:
     if wine is None:
         return "no instalado (instálalo desde los repositorios de tu distribución)"
     return f"{wine.description} ({wine.wine})"
+
+
+_STATUS_WORDS = {
+    CheckStatus.OK: "sí",
+    CheckStatus.WARNING: "aviso",
+    CheckStatus.ERROR: "NO",
+    CheckStatus.UNKNOWN: "no se sabe",
+}
+
+
+def opengl_status() -> str:
+    """OpenGL de 32 y 64 bits (``ldconfig -p`` tarda milisegundos).
+
+    Pokémon Z y otros juegos mkxp-z de 32 bits necesitan el de 32 bits.
+    """
+    parts = []
+    for check in check_system_opengl():
+        text = f"{check.label}: {_STATUS_WORDS[check.status]}"
+        if check.status is CheckStatus.OK:
+            text += f" ({check.detail})"
+        elif check.hint:
+            text += f". {check.hint}"
+        parts.append(text)
+    return "\n".join(parts)
 
 
 PAGE_TITLES = ("Biblioteca", "Diagnóstico", "Acerca de")
@@ -107,6 +133,7 @@ class MainWindow(QMainWindow):
             "Estado": str(self._paths.state_dir),
             "Log": self._log_file or "(sin fichero)",
             "Wine": wine_status(),
+            "OpenGL": opengl_status(),
         }
         for key, value in rows.items():
             form.addRow(f"{key}:", _wrapping_label(value))

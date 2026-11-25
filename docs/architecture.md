@@ -159,7 +159,7 @@ Decisiones, comprobadas con Wine 9.0 en Ubuntu 24.04:
 Comprobado con Wine real (prueba `test_stop_game_closes_game_and_secondary_processes`): `stop_game` cierra el juego y otro programa lanzado aparte en el mismo prefijo antes de que actúe el cierre forzado, y después no queda ningún proceso en el prefijo.
 
 **Pendiente para el sprint 5 (interfaz):**
-- La página "Diagnóstico" ejecuta `wine --version` en el hilo de la interfaz. Tarda milisegundos, pero si Wine se colgara bloquearía la ventana hasta 30 s.
+- La página "Diagnóstico" ejecuta `wine --version` y `ldconfig -p` (OpenGL, desde el sprint 4) en el hilo de la interfaz. Tardan milisegundos, pero si se colgaran bloquearían la ventana hasta 30 y 15 s.
 - `prepare_launch` puede tardar segundos (crear el prefijo) y tendrá que ejecutarse en un hilo de trabajo.
 
 ### Programa de prueba

@@ -113,6 +113,12 @@ def check_filesystem(host: HostSystem, analysis: GameAnalysis) -> RequirementChe
     return RequirementCheck("filesystem", label, CheckStatus.OK, fstype)
 
 
+def check_system_opengl(host: HostSystem | None = None) -> tuple[RequirementCheck, ...]:
+    """OpenGL de 32 y 64 bits, sin mirar ningún juego (para la página de diagnóstico)."""
+    host = host or HostSystem()
+    return tuple(check_opengl(host, bits) for bits in (32, 64))
+
+
 def check_requirements(
     analysis: GameAnalysis, host: HostSystem | None = None
 ) -> tuple[RequirementCheck, ...]:
