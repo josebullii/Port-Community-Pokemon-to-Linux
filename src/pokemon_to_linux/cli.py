@@ -39,6 +39,7 @@ from pokemon_to_linux.application.check_requirements import check_requirements, 
 from pokemon_to_linux.application.diagnose_output import Finding, OutputDiagnoser
 from pokemon_to_linux.application.launch_game import (
     MISSING_32_BIT_HINT,
+    NO_WINE_MESSAGE,
     LaunchError,
     LaunchPlan,
     default_game_id,
@@ -70,12 +71,6 @@ EXIT_OK = EXIT_DETECTED = 0
 EXIT_NOT_DETECTED = 1
 EXIT_ERROR = 2
 EXIT_CANCELLED = 130  # convención de las shells para Ctrl+C
-
-NO_WINE_MESSAGE = (
-    "Wine no está instalado. Instálalo desde los repositorios de tu distribución "
-    "(Debian/Ubuntu: sudo apt install wine; Fedora: sudo dnf install wine; "
-    "Arch: sudo pacman -S wine). Pokémon to Linux no lo instala por ti."
-)
 
 
 def _format_size(size: int) -> str:

@@ -4,6 +4,7 @@ from pokemon_to_linux.application.diagnose_output import (
     GENERIC_ISSUES,
     MAX_LINE,
     OutputDiagnoser,
+    find_issue,
 )
 from pokemon_to_linux.domain.profile import GameProfile, KnownIssue, ProfileMatch
 
@@ -194,3 +195,12 @@ def test_audio_device_failure():
     [finding] = diagnoser.problems
     assert finding.issue.id == "audio-no-disponible"
     assert "libpulse0:i386" in finding.issue.solution
+
+
+def test_find_issue_prefers_the_profile():
+    profile = pokemon_z()
+
+    assert find_issue("fluidsynth-sin-midi", profile).harmless
+    assert find_issue("opengl-sin-formato", profile).id == "opengl-sin-formato"
+    assert find_issue("fluidsynth-sin-midi") is None
+    assert find_issue("no-existe", profile) is None
