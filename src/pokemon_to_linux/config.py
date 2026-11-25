@@ -49,6 +49,11 @@ class AppPaths:
         return self.data_dir / "library.sqlite3"
 
     @property
+    def profiles_dir(self) -> Path:
+        """Perfiles de compatibilidad del usuario (``*.toml``)."""
+        return self.config_dir / "profiles"
+
+    @property
     def log_dir(self) -> Path:
         return self.state_dir / "logs"
 

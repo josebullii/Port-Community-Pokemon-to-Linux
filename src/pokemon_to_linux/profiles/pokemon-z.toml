@@ -1,0 +1,50 @@
+# Perfil de compatibilidad de Pokémon Z (fangame de RPG Maker XP con mkxp-z).
+# Formato: docs/profiles.md. Son datos, nunca código: se validan antes de usarse.
+
+schema = 1
+id = "pokemon-z"
+name = "Pokémon Z"
+description = "Fangame de Pokémon Essentials sobre RPG Maker XP. Game.exe es mkxp-z (32 bits, OpenGL)."
+
+[match]
+engine = "rpgmaker_xp"
+runtimes = ["mkxp-z"]
+titles = ["Pokemon Z"]
+
+[wine]
+# El juego es de 32 bits: un prefijo win64 lo ejecuta con WoW64.
+arch = "win64"
+
+[saves]
+# Pokémon Essentials guarda en "Saved Games" del usuario (lo confirma el
+# acceso directo "Partidas Guardadas.lnk" del juego). Con Wine, esta carpeta
+# está DENTRO del prefijo: si se borra el prefijo, se pierden las partidas.
+paths = ["%USERPROFILE%/Saved Games/Pokemon Z"]
+# mkxp-z guarda aquí la configuración de teclas (keybindings.mkxp1).
+config = ["%APPDATA%/Pokemon Z"]
+
+[compatibility]
+status = "partial"
+notes = "Arranca y es jugable con Wine 9.0 en Ubuntu 24.04. Quedan funciones de la lista de pruebas sin comprobar."
+
+# Problemas conocidos según la documentación del propio juego.
+
+[[known_issues]]
+id = "demasiado-rapido"
+symptom = "El juego va demasiado rápido."
+solution = "En las opciones del juego, pon VSync en «No» y reinicia el juego."
+
+[[known_issues]]
+id = "negro-pantalla-completa"
+symptom = "La pantalla se queda en negro al poner pantalla completa."
+solution = "Juega en ventana o activa el suavizado FXAA en el panel del driver gráfico."
+
+[[known_issues]]
+id = "cierre-sprites-animados"
+symptom = "El juego se cierra cuando sale un Pokémon en combate."
+solution = "Desactiva los sprites animados en las opciones del juego."
+
+[[known_issues]]
+id = "barras-verdes"
+symptom = "Error de OpenGL o barras verdes en pantalla."
+solution = "Actualiza los drivers gráficos (Mesa o el driver propietario, también en 32 bits)."
