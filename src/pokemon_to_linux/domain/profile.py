@@ -7,9 +7,10 @@ partidas y qué problemas conocidos tiene.
 Son **datos declarativos que se validan antes de usarlos**, nunca scripts:
 
 - Las claves desconocidas son un error (una errata no debe pasar inadvertida).
-- Solo se admiten variables de entorno de una lista cerrada. Nada de
-  ``LD_PRELOAD``, ``PATH`` ni ``WINE*``, que podrían ejecutar código o
-  romper el aislamiento del prefijo.
+- Solo se admiten variables de entorno de una lista cerrada de nombres
+  exactos, y sus valores no pueden ser rutas. Nada de ``LD_PRELOAD``,
+  ``PATH``, ``WINE*``, ``LIBGL_DRIVERS_PATH`` ni ``SDL_DYNAMIC_API``, que
+  cargarían bibliotecas arbitrarias o romperían el aislamiento del prefijo.
 - Las rutas de partidas parten de una carpeta conocida (``%USERPROFILE%``,
   ``%APPDATA%``…) y no pueden salir de ella con ``..``.
 - Los patrones de salida son texto literal, no expresiones regulares.
@@ -31,10 +32,55 @@ ARCHES = ("win32", "win64")
 
 _ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 
-ALLOWED_ENVIRONMENT = re.compile(
-    r"^(LANG|LANGUAGE|LC_[A-Z]+|TZ|SDL_[A-Z0-9_]+|MESA_[A-Z0-9_]+|LIBGL_[A-Z0-9_]+"
-    r"|__GL_[A-Z0-9_]+|vblank_mode|PULSE_LATENCY_MSEC)$"
-)
+_LOCALE_VALUE = re.compile(r"^[A-Za-z0-9_.@:-]*$")
+"""Nombres de locale (``es_ES.UTF-8``, ``es:en``). Sin ``/``: glibc tomaría una ruta."""
+_TZ_VALUE = re.compile(r"^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$")
+"""Zonas como ``Europe/Madrid``. Nunca una ruta absoluta ni ``..``."""
+_OPTION_VALUE = re.compile(r"^[A-Za-z0-9_.,+ -]*$")
+"""Opciones simples (``pulse``, ``1``, ``3.3COMPAT``). Sin ``/``: nada de rutas."""
+
+ALLOWED_ENVIRONMENT: dict[str, re.Pattern[str]] = {
+    **dict.fromkeys(
+        (
+            "LANG",
+            "LANGUAGE",
+            "LC_ALL",
+            "LC_CTYPE",
+            "LC_MESSAGES",
+            "LC_NUMERIC",
+            "LC_TIME",
+            "LC_COLLATE",
+            "LC_MONETARY",
+        ),
+        _LOCALE_VALUE,
+    ),
+    "TZ": _TZ_VALUE,
+    **dict.fromkeys(
+        (
+            "SDL_AUDIODRIVER",
+            "SDL_VIDEODRIVER",
+            "SDL_RENDER_DRIVER",
+            "SDL_RENDER_VSYNC",
+            "MESA_GL_VERSION_OVERRIDE",
+            "MESA_GLSL_VERSION_OVERRIDE",
+            "MESA_NO_ERROR",
+            "mesa_glthread",
+            "LIBGL_ALWAYS_SOFTWARE",
+            "LIBGL_DRI3_DISABLE",
+            "__GL_SYNC_TO_VBLANK",
+            "__GL_THREADED_OPTIMIZATIONS",
+            "vblank_mode",
+            "PULSE_LATENCY_MSEC",
+        ),
+        _OPTION_VALUE,
+    ),
+}
+"""Variables de entorno que puede fijar un perfil, con el formato de su valor.
+
+Es una lista de nombres exactos, no de prefijos: ``LIBGL_*``, ``MESA_*`` o
+``SDL_*`` incluyen variables que cargan bibliotecas de cualquier carpeta
+(``LIBGL_DRIVERS_PATH``, ``MESA_LOADER_DRIVER_OVERRIDE``, ``SDL_DYNAMIC_API``).
+"""
 MAX_ENV_VALUE = 256
 
 GAME_DIR = "%GAMEDIR%"
@@ -189,10 +235,13 @@ def _check_id(value: str, where: str) -> str:
 def _check_environment(env: Mapping[str, Any], where: str) -> dict[str, str]:
     checked: dict[str, str] = {}
     for key, value in env.items():
-        if not ALLOWED_ENVIRONMENT.match(key):
+        pattern = ALLOWED_ENVIRONMENT.get(key)
+        if pattern is None:
             raise ProfileError(f"{where}: variable de entorno no permitida: {key}")
-        if not isinstance(value, str) or "\0" in value or len(value) > MAX_ENV_VALUE:
+        if not isinstance(value, str) or len(value) > MAX_ENV_VALUE:
             raise ProfileError(f"{where}.{key}: el valor debe ser un texto corto")
+        if not pattern.match(value) or ".." in value:
+            raise ProfileError(f"{where}.{key}: valor no permitido {value!r}")
         checked[key] = value
     return checked
 

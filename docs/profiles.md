@@ -79,7 +79,17 @@ Hace falta al menos una condición, y **todas** deben cumplirse. Solo se buscan 
 | `arch` | `win64` (por defecto) o `win32`. `run --arch` tiene prioridad |
 | `[wine.environment]` | Variables de entorno para el juego |
 
-Solo se admiten variables que no pueden ejecutar código ni romper el aislamiento del prefijo: `LANG`, `LANGUAGE`, `LC_*`, `TZ`, `SDL_*`, `MESA_*`, `LIBGL_*`, `__GL_*`, `vblank_mode` y `PULSE_LATENCY_MSEC`. Cualquier otra (`LD_PRELOAD`, `PATH`, `WINE*`…) es un error. Los valores tienen como máximo 256 caracteres.
+Solo se admiten estos nombres exactos, que no cargan código ni rompen el aislamiento del prefijo:
+
+| Grupo | Variables | Valor |
+|---|---|---|
+| Idioma | `LANG`, `LANGUAGE`, `LC_ALL`, `LC_CTYPE`, `LC_MESSAGES`, `LC_NUMERIC`, `LC_TIME`, `LC_COLLATE`, `LC_MONETARY` | Nombre de locale (`es_ES.UTF-8`), sin `/` |
+| Zona horaria | `TZ` | `Europe/Madrid`; nunca una ruta absoluta ni `..` |
+| SDL | `SDL_AUDIODRIVER`, `SDL_VIDEODRIVER`, `SDL_RENDER_DRIVER`, `SDL_RENDER_VSYNC` | Opción simple, sin `/` |
+| OpenGL | `MESA_GL_VERSION_OVERRIDE`, `MESA_GLSL_VERSION_OVERRIDE`, `MESA_NO_ERROR`, `mesa_glthread`, `LIBGL_ALWAYS_SOFTWARE`, `LIBGL_DRI3_DISABLE`, `__GL_SYNC_TO_VBLANK`, `__GL_THREADED_OPTIMIZATIONS`, `vblank_mode` | Opción simple, sin `/` |
+| Audio | `PULSE_LATENCY_MSEC` | Opción simple |
+
+No se admiten prefijos como `LIBGL_*`, `MESA_*` o `SDL_*`: incluyen variables que cargan una biblioteca de cualquier carpeta (`LIBGL_DRIVERS_PATH`, `MESA_LOADER_DRIVER_OVERRIDE`, `SDL_DYNAMIC_API`). Cualquier otra variable (`LD_PRELOAD`, `PATH`, `WINE*`…) es un error. Los valores tienen como máximo 256 caracteres.
 
 ### `[saves]`
 
