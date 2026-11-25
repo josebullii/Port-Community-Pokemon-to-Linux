@@ -124,11 +124,11 @@ class MainWindow(QMainWindow):
         return answer == QMessageBox.StandardButton.Yes
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802 - API de Qt
-        if self.library is not None and self.library.running:
-            if not self.confirm_close():
+        if self.library is not None:
+            if self.library.busy and not self.confirm_close():
                 event.ignore()
                 return
-            self.library.stop_all()
+            self.library.shutdown()
         # Las tareas en marcha entregarían su resultado a widgets ya borrados.
         self.tasks.wait(5000)
         if self._database is not None:

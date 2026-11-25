@@ -127,6 +127,7 @@ class LibraryPage(QWidget):
         self._diagnosers: dict[str, OutputDiagnoser] = {}
         self._inspections: dict[str, int] = {}
         """Última comprobación pedida por juego: las anteriores se descartan al llegar."""
+        self._closing = False
 
         self.add_button = QPushButton("Añadir juego…")
         self.add_button.clicked.connect(self.add_game)
@@ -349,6 +350,8 @@ class LibraryPage(QWidget):
         )
 
     def _confirm_and_prepare(self, game: Game, pre: _PreLaunch) -> None:
+        if self._closing:
+            return
         blocking = [c for c in pre.checks if c.blocking]
         if blocking:
             problems = "\n\n".join(f"✖ {c.label}: {c.detail}\n→ {c.hint}" for c in blocking)
@@ -382,6 +385,10 @@ class LibraryPage(QWidget):
         )
 
     def _start(self, game: Game, plan: LaunchPlan) -> None:
+        if self._closing:
+            # La ventana se cerró mientras se preparaba: no lanzar un juego sin ella.
+            log.info("No se lanza %s: la aplicación se está cerrando", game.id)
+            return
         try:
             process = launch_game(plan, self.services.processes)
         except ProcessError as exc:
@@ -427,6 +434,17 @@ class LibraryPage(QWidget):
     @property
     def running(self) -> tuple[str, ...]:
         return tuple(self._running)
+
+    @property
+    def busy(self) -> tuple[str, ...]:
+        """Juegos que se están preparando, en marcha o deteniéndose."""
+        active = (Activity.PREPARING, Activity.RUNNING, Activity.STOPPING)
+        return tuple(g for g, a in self._activity.items() if a in active)
+
+    def shutdown(self) -> None:
+        """Al cerrar la ventana: no lanzar nada más y detener lo que esté en marcha."""
+        self._closing = True
+        self.stop_all()
 
     def stop_all(self, timeout_ms: int = 10_000) -> None:
         """Detiene los juegos en marcha y espera a que terminen (al cerrar la ventana)."""

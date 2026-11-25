@@ -376,11 +376,11 @@ def test_main_window_asks_before_closing_with_a_game_running(env, qapp, tmp_path
     from pokemon_to_linux.ui.main_window import MainWindow
 
     window = MainWindow(env["services"].paths, services=env["services"])
-    monkeypatch.setattr(type(window.library), "running", property(lambda self: ("x",)))
+    monkeypatch.setattr(type(window.library), "busy", property(lambda self: ("x",)))
     answers = [False]
     window.confirm_close = lambda: answers.pop(0)
     stopped = []
-    window.library.stop_all = lambda: stopped.append(True)
+    window.library.shutdown = lambda: stopped.append(True)
 
     assert window.close() is False
     assert stopped == []
@@ -397,3 +397,32 @@ def test_format_duration():
     assert format_duration(30) == "menos de 1 min"
     assert format_duration(125) == "2 min"
     assert format_duration(3 * 3600 + 5 * 60) == "3 h 05 min"
+
+
+def test_closing_while_preparing_does_not_launch_the_game(page, env, make_game, monkeypatch):
+    """Si la ventana se cierra mientras se crea el prefijo, el juego no debe arrancar después."""
+    import threading
+
+    from pokemon_to_linux.application import launch_game as real
+
+    release = threading.Event()
+
+    def slow_prepare(*args, **kwargs):
+        release.wait(10)
+        return real.prepare_launch(*args, **kwargs)
+
+    monkeypatch.setattr("pokemon_to_linux.ui.library_page.prepare_launch", slow_prepare)
+    add(page, make_game(exe="mkxp-z"))
+    wait_for_details(page)
+
+    page.view.play_button.click()
+    wait_until(lambda: page.view.activity == "preparing")
+    assert page.busy == ("juego-de-prueba",)
+
+    page.shutdown()
+    release.set()
+    wait_until(lambda: page.tasks.pending == 0, timeout=20)
+
+    assert env["services"].processes.active() == ()
+    assert page.running == ()
+    assert env["services"].library.history("juego-de-prueba") == []
