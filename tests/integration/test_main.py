@@ -45,3 +45,12 @@ def test_main_starts_shows_window_and_logs(xdg_tmp, no_event_loop):
     log = (state_dir / "logs" / LOG_FILE_NAME).read_text(encoding="utf-8")
     assert "Iniciando" in log
     assert "Aplicación cerrada (código 0)" in log
+
+
+def test_qt_standard_texts_are_in_spanish(qapp):
+    from PySide6.QtCore import QCoreApplication
+
+    from pokemon_to_linux.main import install_qt_translations
+
+    assert install_qt_translations(qapp)
+    assert QCoreApplication.translate("QPlatformTheme", "&Yes") == "&Sí"
