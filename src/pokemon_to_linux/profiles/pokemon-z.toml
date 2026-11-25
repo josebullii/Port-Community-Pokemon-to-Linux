@@ -48,3 +48,12 @@ solution = "Desactiva los sprites animados en las opciones del juego."
 id = "barras-verdes"
 symptom = "Error de OpenGL o barras verdes en pantalla."
 solution = "Actualiza los drivers gráficos (Mesa o el driver propietario, también en 32 bits)."
+
+# Comprobado al probar el juego (sprint 4).
+
+[[known_issues]]
+id = "fluidsynth-sin-midi"
+symptom = "fluidsynth.dll no se carga y la música MIDI queda desactivada."
+solution = "No afecta: el juego no trae música MIDI (solo ogg, wav y mp3). fluidsynth.dll necesita libreadline8.dll y libsndfile-1.dll, que el juego no incluye, y en Windows pasa lo mismo."
+output = ["fluidsynth.dll"]
+harmless = true

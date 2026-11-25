@@ -5,7 +5,10 @@ terminar resume qué ha pasado y qué hacer. Los patrones son texto literal
 (nunca expresiones regulares) para que un perfil no pueda colgar el
 programa con un patrón patológico.
 
-Problemas generales (de Wine y mkxp-z) más los del perfil del juego.
+Primero se buscan los problemas del perfil del juego y después los
+generales (de Wine y mkxp-z). Así, un perfil puede declarar como
+inofensivo (``harmless``) un mensaje que, sin él, parecería un error: la
+línea que reconoce el perfil ya no se compara con los generales.
 """
 
 from __future__ import annotations
@@ -47,6 +50,16 @@ GENERIC_ISSUES = (
         output=("err:module:import_dll",),
     ),
     KnownIssue(
+        id="audio-no-disponible",
+        symptom="El juego no puede abrir el dispositivo de audio y se cierra.",
+        solution=(
+            "Comprueba que el sonido funciona (pactl info) y vuelve a lanzarlo; a veces "
+            "falla al relanzar justo después de cerrar. Con Wine de 32 bits hace falta "
+            "PulseAudio de 32 bits (Debian/Ubuntu: libpulse0:i386)."
+        ),
+        output=("Error opening OpenAL device",),
+    ),
+    KnownIssue(
         id="sin-pantalla",
         symptom="Wine no encuentra la sesión gráfica.",
         solution="Lanza el juego desde el escritorio (hace falta X11 o XWayland).",
@@ -67,25 +80,29 @@ class Finding:
             "symptom": self.issue.symptom,
             "solution": self.issue.solution,
             "line": self.line,
+            "harmless": self.issue.harmless,
         }
 
 
 class OutputDiagnoser:
     def __init__(self, profile: GameProfile | None = None) -> None:
-        issues: list[KnownIssue] = list(GENERIC_ISSUES)
+        issues: list[KnownIssue] = []
         if profile is not None:
             issues += [i for i in profile.known_issues if i.output]
-        self._pending = issues
+        self._issues = [*issues, *GENERIC_ISSUES]
+        self._seen: set[str] = set()
         self._findings: list[Finding] = []
 
     def feed(self, line: str) -> Finding | None:
         """Analiza una línea. Devuelve el problema si es la primera vez que aparece."""
-        if not self._pending:
-            return None
         text = line[:MAX_LINE]
-        for issue in self._pending:
+        for issue in self._issues:
             if issue.found_in(text):
-                self._pending.remove(issue)
+                # La línea es de este problema aunque ya se haya informado:
+                # no se compara con los siguientes (p. ej. los generales).
+                if issue.id in self._seen:
+                    return None
+                self._seen.add(issue.id)
                 finding = Finding(issue, line.strip()[:300])
                 self._findings.append(finding)
                 return finding
@@ -98,3 +115,8 @@ class OutputDiagnoser:
     @property
     def findings(self) -> tuple[Finding, ...]:
         return tuple(self._findings)
+
+    @property
+    def problems(self) -> tuple[Finding, ...]:
+        """Los hallazgos que no son inofensivos."""
+        return tuple(f for f in self._findings if not f.issue.harmless)

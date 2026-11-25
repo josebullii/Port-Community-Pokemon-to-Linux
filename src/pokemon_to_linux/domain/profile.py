@@ -88,6 +88,8 @@ class KnownIssue:
     solution: str
     output: tuple[str, ...] = ()
     """Textos que, si aparecen en la salida del juego, indican este problema."""
+    harmless: bool = False
+    """Mensaje esperado que no afecta al juego (p. ej. una DLL opcional que no carga)."""
 
     def found_in(self, line: str) -> bool:
         return any(pattern in line for pattern in self.output)
@@ -147,6 +149,9 @@ class _Section:
         if not all(isinstance(v, str) and v and "\0" not in v for v in value):
             raise ProfileError(f"{self._where}.{key}: debe ser una lista de textos no vacíos")
         return tuple(value)
+
+    def boolean(self, key: str) -> bool:
+        return bool(self._get(key, bool, False))
 
     def integer(self, key: str, *, required: bool = False) -> int | None:
         return self._get(key, int, required)
@@ -254,8 +259,13 @@ def parse_profile(data: Mapping[str, Any], source: str = "<perfil>") -> GameProf
             symptom=t.text("symptom", required=True),
             solution=t.text("solution", required=True),
             output=t.texts("output"),
+            harmless=t.boolean("harmless"),
         )
         t.done()
+        if issue.harmless and not issue.output:
+            raise ProfileError(
+                f"{source}.known_issues.{issue.id}: harmless solo tiene sentido con output"
+            )
         issues.append(issue)
     if len({i.id for i in issues}) != len(issues):
         raise ProfileError(f"{source}.known_issues: hay identificadores repetidos")

@@ -65,6 +65,7 @@ def test_full_profile():
     assert profile.config_dirs == ("%APPDATA%/Mi Juego",)  # normalizada
     assert [i.id for i in profile.known_issues] == ["rapido", "gl"]
     assert profile.known_issues[1].found_in("Error: No matching GL pixel format available")
+    assert profile.known_issues[1].harmless is False
     assert not profile.known_issues[0].found_in("cualquier cosa")
     assert profile.status is CompatibilityStatus.PARTIAL
     assert profile.status.label == "Parcial"
@@ -116,6 +117,14 @@ def test_minimal_profile_has_defaults():
         ),
         ({"known_issues": ["texto"]}, "debe ser una tabla"),
         ({"compatibility__status": "perfecto"}, "usa uno de"),
+        (
+            {"known_issues": [{"id": "a", "symptom": "s", "solution": "x", "harmless": True}]},
+            "harmless solo tiene sentido con output",
+        ),
+        (
+            {"known_issues": [{"id": "a", "symptom": "s", "solution": "x", "harmless": "sí"}]},
+            "tipo no válido",
+        ),
         ({"match": "rpgmaker_xp"}, "debe ser una tabla"),
     ],
 )

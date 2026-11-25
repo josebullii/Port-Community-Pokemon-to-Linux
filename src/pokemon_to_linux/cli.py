@@ -505,9 +505,11 @@ def cmd_run(args: argparse.Namespace) -> int:
         print(f"  {outcome.error}")
     if outcome.log_file:
         print(f"  Log: {outcome.log_file}")
-    if diagnoser.findings:
-        print("\nProblemas detectados:", *format_findings(diagnoser.findings), sep="\n")
-        for finding in diagnoser.findings:
+    if expected := [f for f in diagnoser.findings if f.issue.harmless]:
+        print("\nMensajes esperados (no afectan al juego):", *format_findings(expected), sep="\n")
+    if diagnoser.problems:
+        print("\nProblemas detectados:", *format_findings(diagnoser.problems), sep="\n")
+        for finding in diagnoser.problems:
             log.warning("%s: %s (%s)", plan.game_id, finding.issue.id, finding.line)
     if outcome.state is ProcessState.FINISHED and outcome.exit_code is not None:
         return outcome.exit_code if 0 <= outcome.exit_code <= 255 else EXIT_NOT_DETECTED

@@ -111,3 +111,67 @@ def test_long_lines_are_trimmed():
 def test_generic_issue_ids_are_unique():
     ids = [i.id for i in GENERIC_ISSUES]
     assert len(ids) == len(set(ids))
+
+
+# Salida real de Pokémon Z funcionando en Ubuntu 24.04 (sprint 4): fluidsynth.dll
+# no carga porque el juego no trae sus dependencias. No afecta (no hay MIDI).
+POKEMON_Z_OUTPUT = [
+    "RGSS version 1 (RPG Maker XP) ",
+    '012c:err:module:import_dll Library libreadline8.dll (which is needed by L"Z:\\root\\'
+    'games\\POKEMON Z V2.19\\fluidsynth.dll") not found',
+    '012c:err:module:import_dll Library libsndfile-1.dll (which is needed by L"Z:\\root\\'
+    'games\\POKEMON Z V2.19\\fluidsynth.dll") not found',
+    "Failed to load fluidsynth.dll. Midi playback is disabled. ",
+    "ALC_SOFT_pause_device present ",
+    "GL Vendor    : Mesa ",
+]
+
+
+def pokemon_z():
+    from pokemon_to_linux.infrastructure.filesystem.profile_store import load_profiles
+
+    return load_profiles(None).get("pokemon-z")
+
+
+def test_pokemon_z_profile_marks_fluidsynth_as_harmless():
+    diagnoser = OutputDiagnoser(pokemon_z())
+    diagnoser.feed_all(POKEMON_Z_OUTPUT)
+
+    [finding] = diagnoser.findings
+    assert finding.issue.id == "fluidsynth-sin-midi"
+    assert finding.issue.harmless
+    assert finding.to_dict()["harmless"] is True
+    assert diagnoser.problems == ()
+
+
+def test_without_profile_the_missing_dll_is_a_problem():
+    diagnoser = OutputDiagnoser()
+    diagnoser.feed_all(POKEMON_Z_OUTPUT)
+
+    assert [f.issue.id for f in diagnoser.problems] == ["dll-no-encontrada"]
+
+
+def test_other_missing_dlls_are_still_problems_with_profile():
+    diagnoser = OutputDiagnoser(pokemon_z())
+    diagnoser.feed_all(
+        [
+            *POKEMON_Z_OUTPUT,
+            '0024:err:module:import_dll Library d3dx9_43.dll (which is needed by L"x.dll")',
+        ]
+    )
+    assert [f.issue.id for f in diagnoser.problems] == ["dll-no-encontrada"]
+
+
+def test_audio_device_failure():
+    """Visto al relanzar Pokémon Z justo después de cerrarlo (WSLg)."""
+    diagnoser = OutputDiagnoser()
+    diagnoser.feed_all(
+        [
+            "ALSA lib pcm.c:2721:(snd_pcm_open_noupdate) Unknown PCM default",
+            "AL lib: (EE) ALCmmdevPlayback_open: Device init failed: 0x80070490",
+            "Error opening OpenAL device ",
+        ]
+    )
+    [finding] = diagnoser.problems
+    assert finding.issue.id == "audio-no-disponible"
+    assert "libpulse0:i386" in finding.issue.solution
