@@ -5,7 +5,7 @@
 
 Lanzador y gestor de compatibilidad para ejecutar en Linux **fangames de Pokémon creados para Windows**, empezando por **Pokémon Z** (RPG Maker XP / Pokémon Essentials). El objetivo final es que también funcionen en consolas portátiles Linux como la **Anbernic R36S**.
 
-> **Estado:** sprint 4 completado: **Pokémon Z se ejecuta en Linux con Wine**. Se ha probado en Ubuntu 24.04 (pantalla de título, menús, exploración, guardar y cargar partida). La aplicación reconoce el juego por su perfil de compatibilidad, comprueba que el sistema tiene lo necesario (Wine y OpenGL de 32 bits), lanza el juego en su propio prefijo y explica los problemas conocidos que aparezcan. Por ahora se hace desde la terminal (`pokemon-to-linux-cli check` y `run`). El sprint 5 traerá la biblioteca y la interfaz gráfica completa.
+> **Estado:** sprint 4 completado: **Pokémon Z se ejecuta en Linux con Wine**. Se ha probado en Ubuntu 24.04 sobre WSL2, con OpenGL por software (pantalla de título, menús, exploración, guardar y cargar partida); faltan el combate, el audio y un Linux nativo con GPU. La aplicación reconoce el juego por su perfil de compatibilidad, comprueba que el sistema tiene lo necesario (Wine y OpenGL de 32 bits), lanza el juego en su propio prefijo y explica los problemas conocidos que aparezcan. Por ahora se hace desde la terminal (`pokemon-to-linux-cli check` y `run`). El sprint 5 traerá la biblioteca y la interfaz gráfica completa.
 
 ---
 

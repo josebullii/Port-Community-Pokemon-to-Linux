@@ -25,7 +25,7 @@ config = ["%APPDATA%/Pokemon Z"]
 
 [compatibility]
 status = "partial"
-notes = "Arranca y es jugable con Wine 9.0 en Ubuntu 24.04. Quedan funciones de la lista de pruebas sin comprobar."
+notes = "Arranca y es jugable con Wine 9.0 en Ubuntu 24.04 (WSL2, OpenGL por software). Faltan el combate, el audio y un Linux nativo con GPU."
 
 # Problemas conocidos según la documentación del propio juego.
 

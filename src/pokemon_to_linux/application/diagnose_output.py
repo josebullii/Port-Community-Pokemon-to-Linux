@@ -53,8 +53,9 @@ GENERIC_ISSUES = (
         id="audio-no-disponible",
         symptom="El juego no puede abrir el dispositivo de audio y se cierra.",
         solution=(
-            "Comprueba que el sonido funciona (pactl info) y vuelve a lanzarlo; a veces "
-            "falla al relanzar justo después de cerrar. Con Wine de 32 bits hace falta "
+            "Comprueba que el sonido funciona (pactl info) y vuelve a lanzarlo. Se ha "
+            "visto una vez, al relanzar el juego justo después de cerrarlo, y al repetir "
+            "funcionó; la causa no está confirmada. Si se repite siempre, puede faltar "
             "PulseAudio de 32 bits (Debian/Ubuntu: libpulse0:i386)."
         ),
         output=("Error opening OpenAL device",),

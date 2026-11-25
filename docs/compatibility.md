@@ -111,7 +111,9 @@ Lista de funciones:
 | 7 | Cargar partida | ✅ | Tras cerrar con `run` (Ctrl+C) y volver a lanzar: "Continuar" carga la partida en el mismo sitio |
 | 8 | Estabilidad (30 min) | ✅ | 33 min sin cierres, con la memoria estable en 375 MB (en el mapa, con animación de clima continua). Cerrado con run (Ctrl+C) sin procesos colgados |
 
-Estado: **🟧 Parcial**. Arranca y se puede jugar; falta comprobar el combate (incluido el problema de los sprites animados) y el audio con altavoces.
+Estado: **🟧 Parcial**. Arranca y se puede jugar; falta comprobar el combate (incluido el problema de los sprites animados), el audio con altavoces y un Linux nativo con GPU (todo se ha probado en WSL2 con llvmpipe).
+
+Las instrucciones de paquetes para Fedora y Arch que da la aplicación no se han probado; tampoco se ha medido la carga desde carpetas de red (solo `/mnt/c` de WSL).
 
 #### Problemas encontrados
 

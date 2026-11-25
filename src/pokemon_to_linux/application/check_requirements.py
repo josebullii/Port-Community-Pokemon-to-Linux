@@ -26,19 +26,25 @@ from pokemon_to_linux.infrastructure.system.host import HostSystem
 from pokemon_to_linux.infrastructure.wine.prefix_manager import PrefixError, PrefixManager
 from pokemon_to_linux.infrastructure.wine.wine_manager import WineError
 
+# Solo los paquetes de Debian/Ubuntu se han probado (Ubuntu 24.04). Los de
+# Fedora y Arch son los nombres de sus repositorios, sin probar todavía.
 OPENGL_HINTS = {
     32: (
         "Instala OpenGL de 32 bits. Debian/Ubuntu: sudo apt install libgl1:i386 "
-        "libgl1-mesa-dri:i386 · Fedora: sudo dnf install mesa-libGL.i686 "
-        "mesa-dri-drivers.i686 · Arch: activa [multilib] y sudo pacman -S lib32-mesa. "
+        "libgl1-mesa-dri:i386 · Fedora (sin probar): sudo dnf install mesa-libGL.i686 "
+        "mesa-dri-drivers.i686 · Arch (sin probar): activa [multilib] y sudo pacman -S "
+        "lib32-mesa. "
         "Con drivers propietarios de NVIDIA, instala también su versión de 32 bits."
     ),
     64: (
         "Instala OpenGL. Debian/Ubuntu: sudo apt install libgl1 libgl1-mesa-dri · "
-        "Fedora: sudo dnf install mesa-libGL mesa-dri-drivers · Arch: sudo pacman -S mesa."
+        "Fedora (sin probar): sudo dnf install mesa-libGL mesa-dri-drivers · "
+        "Arch (sin probar): sudo pacman -S mesa."
     ),
 }
 
+# Solo se ha medido 9P (WSL). Las carpetas de red se avisan porque cada uno
+# de los miles de ficheros del juego viaja por la red, pero no se han medido.
 SLOW_FILESYSTEMS = {
     "9p": "carpeta de Windows compartida con WSL",
     "drvfs": "carpeta de Windows compartida con WSL",
@@ -113,9 +119,10 @@ def check_filesystem(host: HostSystem, analysis: GameAnalysis) -> RequirementChe
             "filesystem",
             label,
             CheckStatus.WARNING,
-            f"Está en {SLOW_FILESYSTEMS[fstype]} ({fstype}): la carga será mucho más lenta",
-            "Copia el juego a una carpeta de Linux (p. ej. ~/Juegos). En WSL, Pokémon Z "
-            "tarda unos 2,5 minutos en mostrar el título desde /mnt/c.",
+            f"Está en {SLOW_FILESYSTEMS[fstype]} ({fstype}): la carga puede ser mucho más lenta",
+            "Copia el juego a una carpeta de Linux (p. ej. ~/Juegos). Medido en WSL: "
+            "Pokémon Z tarda unos 2,5 minutos en mostrar el título desde /mnt/c y unos "
+            "20 s desde ext4.",
         )
     return RequirementCheck("filesystem", label, CheckStatus.OK, fstype)
 
