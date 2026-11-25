@@ -83,3 +83,37 @@ def test_diagnostics_shows_wine_error(qapp, tmp_path, monkeypatch):
 
     assert "error: wine --version falló" in _diagnostics_text(win)
     win.deleteLater()
+
+
+def _host_with(libraries):
+    from pokemon_to_linux.infrastructure.system.host import HostSystem
+
+    host = HostSystem(env={})
+    host.__dict__["shared_libraries"] = libraries
+    return host
+
+
+@pytest.mark.parametrize(
+    ("libraries", "expected"),
+    [
+        (
+            {"libGL.so.1": {32, 64}, "libGLX.so.0": {32, 64}, "libGLX_mesa.so.0": {32, 64}},
+            "OpenGL de 32 bits: sí (libGL.so.1 (mesa))",
+        ),
+        ({"libGL.so.1": {64}}, "OpenGL de 32 bits: NO. Instala OpenGL de 32 bits"),
+        (None, "OpenGL de 32 bits: no se sabe"),
+    ],
+)
+def test_diagnostics_shows_opengl(qapp, tmp_path, monkeypatch, libraries, expected):
+    from pokemon_to_linux.ui.main_window import MainWindow
+
+    monkeypatch.setattr(
+        "pokemon_to_linux.application.check_requirements.HostSystem",
+        lambda: _host_with(libraries),
+    )
+    win = MainWindow(AppPaths.from_environment(env={}, home=tmp_path))
+
+    text = _diagnostics_text(win)
+    assert expected in text
+    assert "OpenGL de 64 bits" in text
+    win.deleteLater()

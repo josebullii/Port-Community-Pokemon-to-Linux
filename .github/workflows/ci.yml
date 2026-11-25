@@ -120,9 +120,12 @@ jobs:
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update
+          # libgl1:i386 y libgl1-mesa-dri:i386: OpenGL de 32 bits, que necesitan
+          # los juegos mkxp-z de 32 bits como Pokémon Z. wine32:i386 no lo trae
+          # con --no-install-recommends.
           sudo apt-get install -y --no-install-recommends \
             libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3 libglib2.0-0t64 \
-            wine wine64 wine32:i386 xvfb xauth
+            wine wine64 wine32:i386 libgl1:i386 libgl1-mesa-dri:i386 xvfb xauth
           wine --version
 
       - name: Instalar el proyecto
@@ -130,6 +133,21 @@ jobs:
 
       - name: Wine detecta 32 y 64 bits
         run: xvfb-run -a pokemon-to-linux-cli wine --probe
+
+      - name: OpenGL de 32 y 64 bits detectado
+        run: |
+          python - <<'PY'
+          from pokemon_to_linux.application.check_requirements import check_opengl
+          from pokemon_to_linux.infrastructure.system.host import HostSystem
+
+          for bits in (32, 64):
+              check = check_opengl(HostSystem(), bits)
+              print(f"{check.label}: {check.status.value} ({check.detail})")
+              assert check.status.value == "ok", check
+          PY
+
+      - name: Perfiles integrados válidos
+        run: pokemon-to-linux-cli profiles
 
       - name: Pruebas con Wine real
         run: xvfb-run -a pytest -m wine -v

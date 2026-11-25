@@ -4,10 +4,12 @@ import pytest
 from test_prefix_manager import WINE, FakeWine
 
 from pokemon_to_linux.application.launch_game import (
+    GAME_WINEDEBUG,
     MISSING_32_BIT_HINT,
     LaunchError,
     prepare_launch,
 )
+from pokemon_to_linux.domain.profile import GameProfile, ProfileMatch
 from pokemon_to_linux.infrastructure.wine.prefix_manager import PrefixError, PrefixManager
 
 
@@ -120,3 +122,66 @@ def test_without_wineserver_there_is_no_stop_command(make_game, prefixes):
     plan = prepare_launch(make_game(exe="runnable"), wine=wine, prefixes=manager)
 
     assert plan.spec.stop_command is None
+
+
+# --- Perfiles (sprint 4) -----------------------------------------------------------
+
+
+def profile(**kwargs):
+    defaults = {
+        "id": "prueba",
+        "name": "Prueba",
+        "match": ProfileMatch(titles=("Juego de prueba",)),
+    }
+    return GameProfile(**{**defaults, **kwargs})
+
+
+def test_matching_profile_is_applied(make_game, prefixes):
+    game = make_game(exe="runnable")
+    p = profile(
+        arch="win32",
+        environment={"LANG": "es_ES.UTF-8", "SDL_AUDIODRIVER": "pulse"},
+        save_dirs=("%USERPROFILE%/Saved Games/Prueba", "%GAMEDIR%/Saves"),
+        config_dirs=("%APPDATA%/Prueba",),
+    )
+    other = profile(id="otro", match=ProfileMatch(titles=("Otro",)), arch="win64")
+
+    plan = prepare_launch(
+        game,
+        wine=WINE,
+        prefixes=pm(prefixes, FakeWine()),
+        profiles=[other, p],
+        extra_env={"LANG": "C.UTF-8"},
+    )
+
+    assert plan.profile is p
+    assert plan.prefix.arch == "win32"
+    env = plan.spec.environment
+    assert env["LANG"] == "C.UTF-8"  # extra_env manda sobre el perfil
+    assert env["SDL_AUDIODRIVER"] == "pulse"
+    assert env["WINEDEBUG"] == GAME_WINEDEBUG
+    users = prefixes / "juego-de-prueba" / "drive_c" / "users"
+    assert plan.save_dirs[0].parent.parent.parent == users
+    assert plan.save_dirs[0].parts[-2:] == ("Saved Games", "Prueba")
+    assert plan.save_dirs[1] == game.resolve() / "Saves"
+    assert plan.config_dirs[0].parts[-3:] == ("AppData", "Roaming", "Prueba")
+
+
+def test_explicit_arch_overrides_profile(make_game, prefixes):
+    plan = prepare_launch(
+        make_game(exe="runnable"),
+        wine=WINE,
+        prefixes=pm(prefixes, FakeWine()),
+        profiles=[profile(arch="win32")],
+        arch="win64",
+    )
+    assert plan.prefix.arch == "win64"
+
+
+def test_without_matching_profile(make_game, prefixes):
+    plan = prepare_launch(make_game(exe="runnable"), wine=WINE, prefixes=pm(prefixes, FakeWine()))
+
+    assert plan.profile is None
+    assert plan.save_dirs == ()
+    assert plan.config_dirs == ()
+    assert plan.spec.environment["WINEDEBUG"] == GAME_WINEDEBUG
