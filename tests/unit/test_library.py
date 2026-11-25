@@ -35,7 +35,7 @@ def library():
 
 
 def host():
-    h = HostSystem(env={"DISPLAY": ":0"})
+    h = HostSystem(env={"DISPLAY": ":0"}, x11_socket_dir=None)
     h.__dict__["shared_libraries"] = {"libGL.so.1": {32, 64}}
     return h
 
@@ -174,7 +174,7 @@ def test_inspect_game_whose_folder_changed(tmp_path):
 def test_inspect_game_not_ready_without_opengl(make_game, tmp_path):
     folder = make_game(exe="mkxp-z")
     game = Game("j", "J", folder, "rpgmaker_xp", "mkxp-z", 32, NOW)
-    no_gl = HostSystem(env={"DISPLAY": ":0"})
+    no_gl = HostSystem(env={"DISPLAY": ":0"}, x11_socket_dir=None)
     no_gl.__dict__["shared_libraries"] = {}
 
     details = inspect_game(game, profiles=[], prefixes_dir=tmp_path, host=no_gl)

@@ -125,7 +125,7 @@ def test_rgss_line_matches_library_in_subfolder(make_game, make_pe, capsys):
 def fake_host(env=None, libraries=None):
     from pokemon_to_linux.infrastructure.system.host import HostSystem
 
-    host = HostSystem(env={"DISPLAY": ":0"} if env is None else env)
+    host = HostSystem(env={"DISPLAY": ":0"} if env is None else env, x11_socket_dir=None)
     host.__dict__["shared_libraries"] = {"libGL.so.1": {32, 64}} if libraries is None else libraries
     return host
 

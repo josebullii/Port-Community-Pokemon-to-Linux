@@ -51,8 +51,8 @@ servidor:/juegos /mnt/mis\\040juegos nfs4 rw 0 0
 """
 
 
-def make_host(libraries=None, env=None, mounts_file=Path("/no/existe")):
-    host = HostSystem(env=env or {}, mounts_file=mounts_file)
+def make_host(libraries=None, env=None, mounts_file=Path("/no/existe"), x11_dir=None):
+    host = HostSystem(env=env or {}, mounts_file=mounts_file, x11_socket_dir=x11_dir)
     host.__dict__["shared_libraries"] = libraries  # sustituye a ldconfig -p
     return host
 
@@ -165,6 +165,30 @@ def test_display():
     none = check_display(make_host(env={"DISPLAY": ""}))
     assert none.status is CheckStatus.ERROR
     assert none.blocking
+
+
+@pytest.mark.parametrize(
+    ("display", "socket"),
+    [(":0", "X0"), (":1.0", "X1"), ("unix:2", "X2"), ("localhost:10.0", None), ("x", None)],
+)
+def test_x11_socket(tmp_path, display, socket):
+    host = make_host(env={"DISPLAY": display}, x11_dir=tmp_path)
+    assert host.x11_socket() == (tmp_path / socket if socket else None)
+
+
+def test_display_without_x_server(tmp_path):
+    host = make_host(env={"DISPLAY": ":0"}, x11_dir=tmp_path)
+
+    check = check_display(host)
+    assert check.status is CheckStatus.WARNING
+    assert "no hay ningún servidor X" in check.detail
+    assert not check.blocking
+
+    (tmp_path / "X0").touch()
+    assert check_display(host).status is CheckStatus.OK
+    # Pantalla remota (ssh -X): no se puede comprobar, se da por buena.
+    remote = make_host(env={"DISPLAY": "localhost:10.0"}, x11_dir=tmp_path)
+    assert check_display(remote).status is CheckStatus.OK
 
 
 def test_opengl_ok_with_vendor():
