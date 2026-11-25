@@ -208,7 +208,7 @@ Ctrl+C:
 1. Ruff (lint y formato)
 2. pytest
 3. Arranque real de la aplicación durante 5 s sin pantalla, comprobando el log
-4. CLI, bibliotecas X11 completas y arranque en X11 (Xvfb)
+4. CLI, biblioteca (se crea al arrancar; `library` y `library add`), bibliotecas X11 completas y arranque en X11 (Xvfb)
 5. Construcción del paquete (wheel)
 
 **Job `wine`** (Ubuntu 24.04, Python 3.12):

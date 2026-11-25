@@ -75,6 +75,15 @@ jobs:
           # El propio repositorio no es un juego: debe salir 1 (no detectado).
           test "$code" -eq 1
 
+      - name: La biblioteca funciona
+        run: |
+          # La aplicación ya ha creado la base de datos al arrancar.
+          test -f ~/.local/share/pokemon-to-linux/library.sqlite3
+          pokemon-to-linux-cli library | grep -q "(vacía)"
+          code=0
+          pokemon-to-linux-cli library add . || code=$?
+          test "$code" -eq 1   # no es un juego: no se añade
+
       - name: Bibliotecas X11 completas
         run: |
           plugin=$(python -c "import pathlib, PySide6; print(pathlib.Path(PySide6.__file__).parent / 'Qt/plugins/platforms/libqxcb.so')")
