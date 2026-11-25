@@ -63,3 +63,5 @@ ignore = []
 # S603 avisa de cualquier subprocess. Aquí los argumentos son siempre listas
 # con rutas absolutas resueltas por WineManager, nunca shell=True.
 "src/pokemon_to_linux/infrastructure/wine/*" = ["S603"]
+# ldconfig -p con la ruta absoluta que se ha localizado.
+"src/pokemon_to_linux/infrastructure/system/*" = ["S603"]
