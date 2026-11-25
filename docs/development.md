@@ -45,7 +45,25 @@ ldd .venv/lib/python3*/site-packages/PySide6/Qt/plugins/platforms/libqxcb.so | g
 
 > Debian 12 trae Python 3.11, que no es suficiente. Usa Debian 13, Ubuntu 24.04 o una versión más reciente, o instala Python 3.12 por otra vía (p. ej. `uv python install 3.12`).
 
-Wine (sprint 3 en adelante): `sudo apt install wine`, `sudo dnf install wine` o `sudo pacman -S wine`.
+### Wine (desde el sprint 3)
+
+Pokémon Z y la mayoría de fangames de RPG Maker XP son **de 32 bits**, así que Wine necesita soporte de 32 bits.
+
+| Distribución | Comando |
+|---|---|
+| Debian / Ubuntu | `sudo dpkg --add-architecture i386 && sudo apt update && sudo apt install wine wine64 wine32:i386` |
+| Fedora | `sudo dnf install wine` (trae el soporte de 32 bits) |
+| Arch / Manjaro | activar `[multilib]` en `/etc/pacman.conf` y `sudo pacman -S wine` |
+
+Comprueba que funciona:
+
+```bash
+pokemon-to-linux-cli wine --probe
+#   64 bits:     sí
+#   32 bits:     sí      ← imprescindible para Pokémon Z
+```
+
+En Ubuntu, el paquete `wine64` solo no basta. No añade `wine` al PATH (se queda en `/usr/lib/wine/wine64`; la aplicación lo encuentra igualmente) y **no ejecuta programas de 32 bits**: falta `wine32:i386`.
 
 ## Puesta en marcha
 
@@ -65,6 +83,7 @@ pokemon-to-linux                   # o: python -m pokemon_to_linux
 pytest                    # todas las pruebas
 pytest tests/unit         # solo las unitarias (rápidas, no necesitan Qt)
 pytest -m integration     # solo las de integración (Qt sin pantalla)
+pytest -m wine            # solo las que usan Wine real (se omiten si no está)
 ruff check .              # lint
 ruff format .             # formato
 ```
@@ -79,7 +98,7 @@ Las pruebas de Qt usan `QT_QPA_PLATFORM=offscreen`, que se fija en `tests/confte
 | `xdg_tmp` | Redirige las cuatro rutas XDG a un directorio temporal |
 | `_reset_app_logger` | (automática) Cierra los handlers del log tras cada prueba |
 | `make_pe` | Construye un ejecutable PE mínimo y válido (arquitectura, DLL importadas, marcadores) |
-| `make_game` | Crea una carpeta de juego RPG Maker XP falsa y configurable (INI, exe, DLL, `Data/`…) |
+| `make_game` | Crea una carpeta de juego RPG Maker XP falsa y configurable (INI, exe, DLL, `Data/`…). Con `exe="runnable"`, `Game.exe` es un programa real de 32 bits que termina con código 7 |
 
 ### Archivos de juegos en las pruebas
 
@@ -102,14 +121,41 @@ pokemon-to-linux-cli analyze "/ruta/a/POKEMON Z V2.19" --json   # JSON
 
 Códigos de salida: `0` motor detectado, `1` no detectado, `2` ruta no válida.
 
+## Lanzar un juego con Wine desde la terminal
+
+```bash
+pokemon-to-linux-cli wine                    # qué Wine hay instalado
+pokemon-to-linux-cli wine --probe            # ¿ejecuta 32 y 64 bits?
+pokemon-to-linux-cli run "/ruta/al/juego"    # prepara el prefijo y lanza el juego
+pokemon-to-linux-cli run "/ruta/al/juego" --arch win32 --id mi-juego --timeout 60
+```
+
+`run` devuelve el código de salida del juego. Si no terminó normalmente devuelve `1`, y si no se pudo lanzar, `2`.
+
+Ctrl+C:
+- **Con el juego en marcha**, lo detiene de forma ordenada (`wineserver -k`).
+- **Mientras se prepara el prefijo**, cancela, borra el prefijo a medias y devuelve `130`.
+
+- **Prefijos**: `~/.local/share/pokemon-to-linux/prefixes/<id>`.
+- **Log de cada lanzamiento**: `~/.local/state/pokemon-to-linux/logs/games/<id>/<fecha>.log`. Se conservan los últimos 20 por juego.
+
 ## Integración continua
 
-`.github/workflows/ci.yml` se ejecuta en cada push y en cada pull request, en **Ubuntu 24.04 con Python 3.12 y 3.13**:
+`.github/workflows/ci.yml` se ejecuta en cada push y en cada pull request.
+
+**Job principal** (Ubuntu 24.04, Python 3.12 y 3.13):
 
 1. Ruff (lint y formato)
 2. pytest
 3. Arranque real de la aplicación durante 5 s sin pantalla, comprobando el log
-4. Construcción del paquete (wheel)
+4. CLI, bibliotecas X11 completas y arranque en X11 (Xvfb)
+5. Construcción del paquete (wheel)
+
+**Job `wine`** (Ubuntu 24.04, Python 3.12):
+
+1. Instala Wine 9.0 con `wine32:i386`.
+2. Comprueba con `wine --probe` que ejecuta 32 y 64 bits.
+3. Ejecuta `pytest -m wine`, que incluye lanzar el juego de prueba de extremo a extremo.
 
 ## Convenciones
 

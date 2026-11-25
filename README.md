@@ -5,7 +5,7 @@
 
 Lanzador y gestor de compatibilidad para ejecutar en Linux **fangames de Pokémon creados para Windows**, empezando por **Pokémon Z** (RPG Maker XP / Pokémon Essentials). El objetivo final es que también funcionen en consolas portátiles Linux como la **Anbernic R36S**.
 
-> **Estado:** sprint 2 (análisis) completado. La aplicación ya diagnostica la carpeta de un juego: motor, runtime, ejecutable, arquitectura y advertencias. Por ahora lo hace desde la terminal (`pokemon-to-linux-cli analyze`). Todavía no lanza juegos: eso llega en el sprint 3, con Wine.
+> **Estado:** sprint 3 (Wine) completado. La aplicación diagnostica la carpeta de un juego, detecta Wine, crea un prefijo aislado por juego y lanza el juego con Wine, guardando un log de cada ejecución. Por ahora se hace desde la terminal (`pokemon-to-linux-cli analyze`, `wine` y `run`). El sprint 4 se centra en que Pokémon Z funcione de verdad.
 
 ---
 
@@ -142,9 +142,12 @@ Ejemplo de resultado:
 ## Integración con Wine
 
 - Comprueba que Wine está instalado y consulta su versión. **No lo instala sin avisar.**
-- Crea un `WINEPREFIX` para cada juego. La arquitectura (win32 o WoW64) se elige después de analizar el ejecutable. win32 no es una regla fija.
-- Lanza el juego con `QProcess`: captura stdout y stderr, guarda el código de salida y la duración, y cierra los procesos hijos de forma ordenada.
+- Crea un `WINEPREFIX` para cada juego. Por defecto es **win64**, que con soporte de 32 bits ejecuta también juegos de 32 bits como Pokémon Z; win32 es opcional.
+- Antes de usar un prefijo nuevo, **ejecuta un programa de prueba** para confirmar que Wine puede ejecutar los bits del juego. Si falta `wine32`, lo explica.
+- Lanza el juego con `QProcess`: captura stdout y stderr, guarda el código de salida y la duración, y cierra el juego y sus procesos hijos de forma ordenada (`wineserver -k`).
 - El juego se queda en la carpeta que elija el usuario. No hace falta copiarlo.
+
+Las decisiones técnicas están detalladas en [docs/architecture.md](docs/architecture.md#integración-con-wine-sprint-3).
 
 ### Rutas (XDG)
 
@@ -190,7 +193,7 @@ La interfaz muestra estados precisos: *no analizado, detectado, configurado, pro
 - Python 3.12 o superior
 - Bibliotecas X11 que necesita Qt 6
 - Git
-- Wine, solo a partir del sprint 3. Se instala desde los repositorios de tu distribución.
+- Wine **con soporte de 32 bits**. Se instala desde los repositorios de tu distribución; ver [docs/development.md](docs/development.md#wine-desde-el-sprint-3).
 
 En Debian / Ubuntu:
 
@@ -239,6 +242,15 @@ pokemon-to-linux-cli analyze "/ruta/a/POKEMON Z V2.19" --json   # JSON
 
 El informe completo de Pokémon Z está en [docs/compatibility.md](docs/compatibility.md).
 
+### Lanzar un juego con Wine
+
+```bash
+pokemon-to-linux-cli wine --probe            # ¿Wine ejecuta 32 y 64 bits?
+pokemon-to-linux-cli run "/ruta/al/juego"    # prepara el prefijo y lanza el juego
+```
+
+La primera vez se crea el prefijo del juego, lo que tarda unos segundos. Cada ejecución deja un log en `~/.local/state/pokemon-to-linux/logs/games/<id>/`, donde se conservan los 20 últimos. Ctrl+C detiene el juego de forma ordenada, cerrando también sus procesos secundarios.
+
 ### Pruebas y lint
 
 ```bash
@@ -273,7 +285,7 @@ Cada prueba registra el juego y su versión, el motor, la distribución, la arqu
 |---|---|---|
 | 1 · Fundación ✅ | Repositorio, `pyproject.toml`, PySide6, ventana, logging, tests base | La aplicación arranca |
 | 2 · Análisis ✅ | Escáner, lectura de `Game.ini`, detector XP/mkxp-z | Diagnóstico de Pokémon Z |
-| 3 · Wine | WineManager, PrefixManager, QProcess, logs | Juego de prueba lanzado desde Python |
+| 3 · Wine ✅ | WineManager, PrefixManager, QProcess, logs | Juego de prueba lanzado desde Python |
 | 4 · Juego real | Perfil de Pokémon Z, dependencias, pruebas de juego | Pokémon Z se ejecuta por primera vez |
 | 5 · Biblioteca | SQLite, alta de juegos, biblioteca, detalles, diagnóstico | Lanzador completo de principio a fin |
 | 6 · Estabilización | Cierres, fallos, documentación, versión 0.1 | MVP listo para pruebas de la comunidad |

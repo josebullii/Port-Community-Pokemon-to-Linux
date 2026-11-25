@@ -20,6 +20,19 @@ from PySide6.QtWidgets import (
 
 from pokemon_to_linux import APP_NAME, __version__
 from pokemon_to_linux.config import AppPaths
+from pokemon_to_linux.infrastructure.wine.wine_manager import WineError, WineManager
+
+
+def wine_status() -> str:
+    """Texto para la página de diagnóstico (``wine --version`` tarda milisegundos)."""
+    try:
+        wine = WineManager().detect()
+    except WineError as exc:
+        return f"error: {exc}"
+    if wine is None:
+        return "no instalado (instálalo desde los repositorios de tu distribución)"
+    return f"{wine.description} ({wine.wine})"
+
 
 PAGE_TITLES = ("Biblioteca", "Diagnóstico", "Acerca de")
 
@@ -93,7 +106,7 @@ class MainWindow(QMainWindow):
             "Caché": str(self._paths.cache_dir),
             "Estado": str(self._paths.state_dir),
             "Log": self._log_file or "(sin fichero)",
-            "Wine": "pendiente (sprint 3)",
+            "Wine": wine_status(),
         }
         for key, value in rows.items():
             form.addRow(f"{key}:", _wrapping_label(value))
