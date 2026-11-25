@@ -2,82 +2,22 @@
 
 from __future__ import annotations
 
-import platform
-import sys
-
-from PySide6 import __version__ as pyside_version
-from PySide6.QtCore import Qt, qVersion
+from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
-    QFormLayout,
     QHBoxLayout,
-    QLabel,
     QListWidget,
     QMainWindow,
     QStackedWidget,
-    QVBoxLayout,
     QWidget,
 )
 
 from pokemon_to_linux import APP_NAME, __version__
-from pokemon_to_linux.application.check_requirements import check_system_opengl
 from pokemon_to_linux.config import AppPaths
-from pokemon_to_linux.domain.requirements import CheckStatus
-from pokemon_to_linux.infrastructure.wine.wine_manager import WineError, WineManager
-
-
-def wine_status() -> str:
-    """Texto para la página de diagnóstico (``wine --version`` tarda milisegundos)."""
-    try:
-        wine = WineManager().detect()
-    except WineError as exc:
-        return f"error: {exc}"
-    if wine is None:
-        return "no instalado (instálalo desde los repositorios de tu distribución)"
-    return f"{wine.description} ({wine.wine})"
-
-
-_STATUS_WORDS = {
-    CheckStatus.OK: "sí",
-    CheckStatus.WARNING: "aviso",
-    CheckStatus.ERROR: "NO",
-    CheckStatus.UNKNOWN: "no se sabe",
-}
-
-
-def opengl_status() -> str:
-    """OpenGL de 32 y 64 bits (``ldconfig -p`` tarda milisegundos).
-
-    Pokémon Z y otros juegos mkxp-z de 32 bits necesitan el de 32 bits.
-    """
-    parts = []
-    for check in check_system_opengl():
-        text = f"{check.label}: {_STATUS_WORDS[check.status]}"
-        if check.status is CheckStatus.OK:
-            text += f" ({check.detail})"
-        elif check.hint:
-            text += f". {check.hint}"
-        parts.append(text)
-    return "\n".join(parts)
-
+from pokemon_to_linux.ui.diagnostics_page import DiagnosticsPage
+from pokemon_to_linux.ui.tasks import TaskRunner
+from pokemon_to_linux.ui.widgets import page, wrapping_label
 
 PAGE_TITLES = ("Biblioteca", "Diagnóstico", "Acerca de")
-
-
-def _wrapping_label(text: str) -> QLabel:
-    label = QLabel(text)
-    label.setWordWrap(True)
-    label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-    return label
-
-
-def _page(title: str, body: QWidget) -> QWidget:
-    page = QWidget()
-    layout = QVBoxLayout(page)
-    heading = QLabel(f"<h2>{title}</h2>")
-    layout.addWidget(heading)
-    layout.addWidget(body)
-    layout.addStretch(1)
-    return page
 
 
 class MainWindow(QMainWindow):
@@ -85,6 +25,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self._paths = paths
         self._log_file = log_file
+        self.tasks = TaskRunner(self)
 
         self.setWindowTitle(f"{APP_NAME} {__version__}")
         self.resize(900, 600)
@@ -112,35 +53,19 @@ class MainWindow(QMainWindow):
     # --- Páginas ---------------------------------------------------------
 
     def _build_library_page(self) -> QWidget:
-        body = _wrapping_label(
+        body = wrapping_label(
             "Todavía no has añadido ningún juego.\n\n"
             "Próximamente podrás seleccionar la carpeta de un fangame "
             "(p. ej. Pokémon Z) para analizarlo y ejecutarlo."
         )
-        return _page("Biblioteca", body)
+        return page("Biblioteca", body)
 
     def _build_diagnostics_page(self) -> QWidget:
-        body = QWidget()
-        form = QFormLayout(body)
-        rows = {
-            "Versión": __version__,
-            "Python": sys.version.split()[0],
-            "PySide6 / Qt": f"{pyside_version} / {qVersion()}",
-            "Sistema": f"{platform.system()} {platform.release()} ({platform.machine()})",
-            "Datos": str(self._paths.data_dir),
-            "Configuración": str(self._paths.config_dir),
-            "Caché": str(self._paths.cache_dir),
-            "Estado": str(self._paths.state_dir),
-            "Log": self._log_file or "(sin fichero)",
-            "Wine": wine_status(),
-            "OpenGL": opengl_status(),
-        }
-        for key, value in rows.items():
-            form.addRow(f"{key}:", _wrapping_label(value))
-        return _page("Diagnóstico", body)
+        self.diagnostics = DiagnosticsPage(self._paths, self._log_file, self.tasks)
+        return page("Diagnóstico", self.diagnostics)
 
     def _build_about_page(self) -> QWidget:
-        body = _wrapping_label(
+        body = wrapping_label(
             f"{APP_NAME} {__version__}\n\n"
             "Lanzador y gestor de compatibilidad para fangames de Pokémon creados "
             "con RPG Maker XP.\n\n"
@@ -151,4 +76,11 @@ class MainWindow(QMainWindow):
             "Company; este proyecto no está afiliado a ellas. Cada fangame pertenece "
             "a sus autores."
         )
-        return _page("Acerca de", body)
+        return page("Acerca de", body)
+
+    # --- Cierre ----------------------------------------------------------
+
+    def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802 - API de Qt
+        # Las tareas en marcha entregarían su resultado a widgets ya borrados.
+        self.tasks.wait(5000)
+        super().closeEvent(event)

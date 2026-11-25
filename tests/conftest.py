@@ -17,6 +17,19 @@ def qapp():
     yield app
 
 
+def wait_until(predicate, timeout=5.0):
+    """Procesa eventos de Qt hasta que ``predicate()`` sea cierto (tareas en segundo plano)."""
+    import time
+
+    from PySide6.QtCore import QCoreApplication, QEventLoop
+
+    deadline = time.monotonic() + timeout
+    while not predicate():
+        if time.monotonic() > deadline:
+            raise AssertionError("no se cumplió la condición a tiempo")
+        QCoreApplication.processEvents(QEventLoop.ProcessEventsFlag.AllEvents, 50)
+
+
 @pytest.fixture(autouse=True)
 def _reset_app_logger():
     """Cierra los handlers del logger de la app tras cada prueba (evita ficheros abiertos)."""
