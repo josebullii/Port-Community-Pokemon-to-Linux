@@ -1,7 +1,7 @@
 """Interfaz de línea de comandos.
 
     pokemon-to-linux-cli analyze <carpeta> [--json]
-    pokemon-to-linux-cli check <carpeta> [--json]
+    pokemon-to-linux-cli check <carpeta> [--id ID] [--json]
     pokemon-to-linux-cli wine [--probe]
     pokemon-to-linux-cli run <carpeta> [--id ID] [--arch win32|win64] [--timeout SEG]
                              [--ignore-checks]
@@ -35,12 +35,13 @@ from pokemon_to_linux.application.analyze_game import (
     analyze_game,
     engine_display_name,
 )
-from pokemon_to_linux.application.check_requirements import check_requirements
+from pokemon_to_linux.application.check_requirements import check_requirements, check_wine_bits
 from pokemon_to_linux.application.diagnose_output import Finding, OutputDiagnoser
 from pokemon_to_linux.application.launch_game import (
     MISSING_32_BIT_HINT,
     LaunchError,
     LaunchPlan,
+    default_game_id,
     launch_game,
     prepare_launch,
 )
@@ -196,6 +197,9 @@ def _build_parser() -> argparse.ArgumentParser:
         "check", help="comprueba si el sistema tiene lo necesario para jugar a un juego"
     )
     check.add_argument("path", help="carpeta del juego")
+    check.add_argument(
+        "--id", dest="game_id", help="identificador del juego (por defecto, el título)"
+    )
     check.add_argument("--json", action="store_true", help="salida en JSON")
 
     wine = sub.add_parser("wine", help="muestra la instalación de Wine")
@@ -326,9 +330,27 @@ def cmd_check(args: argparse.Namespace) -> int:
         wine, wine_error = WineManager().detect(), None
     except WineError as exc:
         wine, wine_error = None, str(exc)
-    profile = match_profile(analysis, _load_profiles(AppPaths.from_environment()).profiles)
+    paths = AppPaths.from_environment()
+    profile = match_profile(analysis, _load_profiles(paths).profiles)
     detection = analysis.detection
     checks = check_requirements(analysis, HostSystem()) if detection.detected else ()
+    bits = detection.details.get("bits")
+    if detection.detected and wine is not None and bits in (32, 64):
+        game_id = args.game_id or default_game_id(analysis)
+        if not args.json:
+            print(f"Comprobando que Wine ejecuta programas de {bits} bits…", file=sys.stderr)
+        try:
+            wine_check = check_wine_bits(
+                PrefixManager(paths.prefixes_dir, wine),
+                PrefixManager(paths.cache_dir / "probe", wine),
+                game_id,
+                bits,
+            )
+        except PrefixError as exc:
+            return _error(exc)
+        except KeyboardInterrupt:
+            return _cancelled()
+        checks = (*checks, wine_check)
     ready = detection.detected and wine is not None and not any(c.blocking for c in checks)
     code = EXIT_OK if ready else EXIT_NOT_DETECTED
 

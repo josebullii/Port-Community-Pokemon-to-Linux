@@ -74,6 +74,7 @@ pokemon-to-linux-cli check "/ruta/a/POKEMON Z V2.19"
 #   [ok]     Sesión gráfica: X11 en :0
 #   [ok]     OpenGL de 32 bits: libGL.so.1 (mesa)
 #   [ok]     Carpeta del juego: ext4
+#   [ok]     Wine de 32 bits: Ejecuta programas de 32 bits (prefijo pokemon-z)
 #   Listo para jugar: sí
 ```
 
@@ -151,7 +152,7 @@ pokemon-to-linux-cli run "/ruta/al/juego" --arch win32 --id mi-juego --timeout 6
 pokemon-to-linux-cli profiles                # perfiles de compatibilidad cargados
 ```
 
-`check` devuelve `0` si el juego está listo para jugar y `1` si falta algo.
+`check` devuelve `0` si el juego está listo para jugar y `1` si falta algo. Además de la sesión gráfica, OpenGL y el sistema de ficheros, ejecuta el programa de prueba con los bits del juego: en el prefijo del juego si ya existe (unos segundos) o en uno temporal que borra después. Así, `wine64` sin `wine32:i386` da «Listo para jugar: no» en vez de fallar al lanzar.
 
 `run` comprueba primero los requisitos del sistema. Si falta uno imprescindible (p. ej. OpenGL de 32 bits), explica cómo instalarlo y no lanza el juego; `--ignore-checks` lo lanza igualmente. Después aplica el perfil del juego, muestra dónde están las partidas y, al terminar, los problemas reconocidos en la salida con su solución.
 

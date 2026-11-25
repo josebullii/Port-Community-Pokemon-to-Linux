@@ -48,7 +48,7 @@ Pokémon to Linux es un lanzador y gestor de compatibilidad. No reescribe los ju
 | `infrastructure/filesystem/profile_store.py` | Carga los perfiles integrados y los del usuario (`~/.config/…/profiles`) | 4 ✅ |
 | `infrastructure/system/host.py` | `HostSystem`: bibliotecas (`ldconfig -p`), sesión gráfica y sistema de ficheros de cada carpeta | 4 ✅ |
 | `application/profiles.py` | `match_profile` y `resolve_folder` (carpetas de partidas dentro del prefijo) | 4 ✅ |
-| `application/check_requirements.py` | Sesión gráfica, OpenGL con los bits del juego y sistema de ficheros lento | 4 ✅ |
+| `application/check_requirements.py` | Sesión gráfica, OpenGL con los bits del juego, sistema de ficheros lento y `check_wine_bits` (programa de prueba con los bits del juego) | 4 ✅ |
 | `application/diagnose_output.py` | `OutputDiagnoser`: problemas conocidos en la salida del juego | 4 ✅ |
 | `cli.py` | Comandos `check` y `profiles`; `run` comprueba requisitos y diagnostica | 4 ✅ |
 | `infrastructure/database/` | Conexión SQLite y repositorios | 5 |

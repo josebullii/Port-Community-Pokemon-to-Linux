@@ -64,6 +64,11 @@ class LaunchPlan:
     config_dirs: tuple[Path, ...] = ()
 
 
+def default_game_id(analysis: GameAnalysis) -> str:
+    """Identificador del juego (y de su prefijo) si no se indica otro."""
+    return slugify(analysis.detection.details.get("title") or analysis.path.name)
+
+
 def prepare_launch(
     game_path: Path | str,
     *,
@@ -98,7 +103,7 @@ def prepare_launch(
     profile = match_profile(analysis, profiles)
     bits = detection.details.get("bits")
     if game_id is None:
-        game_id = slugify(detection.details.get("title") or analysis.path.name)
+        game_id = default_game_id(analysis)
     validate_game_id(game_id)
     arch = resolve_arch(bits, arch or (profile.arch if profile else None))
 

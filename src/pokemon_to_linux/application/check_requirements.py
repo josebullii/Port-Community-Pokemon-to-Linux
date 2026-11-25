@@ -1,7 +1,6 @@
 """Caso de uso: ¿tiene el sistema lo que necesita este juego?
 
-Comprobaciones (Wine y su soporte de 32 bits se comprueban aparte, con el
-programa de prueba al crear el prefijo):
+Comprobaciones:
 
 - **Sesión gráfica**: Wine necesita X11 (o XWayland).
 - **OpenGL con los bits del juego**: Pokémon Z (mkxp-z) es de 32 bits e
@@ -11,13 +10,21 @@ programa de prueba al crear el prefijo):
   instala si se usa ``--no-install-recommends``.
 - **Sistema de ficheros**: en 9P (``/mnt/c`` de WSL) Pokémon Z tarda unos
   2,5 minutos en mostrar el título.
+- **Wine con los bits del juego** (``check_wine_bits``, aparte porque tarda):
+  ejecuta el programa de prueba. Que Wine esté instalado no basta: en
+  Debian/Ubuntu ``wine64`` sin ``wine32:i386`` no ejecuta Pokémon Z.
 """
 
 from __future__ import annotations
 
+import os
+
 from pokemon_to_linux.application.analyze_game import GameAnalysis
+from pokemon_to_linux.application.launch_game import MISSING_32_BIT_HINT
 from pokemon_to_linux.domain.requirements import CheckStatus, RequirementCheck
 from pokemon_to_linux.infrastructure.system.host import HostSystem
+from pokemon_to_linux.infrastructure.wine.prefix_manager import PrefixError, PrefixManager
+from pokemon_to_linux.infrastructure.wine.wine_manager import WineError
 
 OPENGL_HINTS = {
     32: (
@@ -130,3 +137,42 @@ def check_requirements(
         checks.append(check_opengl(host, bits))
     checks.append(check_filesystem(host, analysis))
     return tuple(checks)
+
+
+def check_wine_bits(
+    prefixes: PrefixManager, probe_prefixes: PrefixManager, game_id: str, bits: int
+) -> RequirementCheck:
+    """¿Ejecuta Wine programas de ``bits`` bits?
+
+    Usa el prefijo del juego si ya existe (unos segundos). Si no, crea uno
+    temporal en ``probe_prefixes`` y lo borra después, como ``wine --probe``.
+    Ctrl+C se propaga, pero el prefijo temporal se borra igualmente.
+    """
+    label = f"Wine de {bits} bits"
+    hint = MISSING_32_BIT_HINT if bits == 32 else "Revisa la instalación de Wine."
+    prefix = prefixes.get(game_id)
+    where = f"prefijo {game_id}"
+    temporary = None
+    try:
+        if prefix is None:
+            temporary = f"comprobacion-{os.getpid()}"
+            where = "prefijo temporal"
+            try:
+                prefix = probe_prefixes.create(temporary, "win64")
+            except (PrefixError, WineError) as exc:
+                return RequirementCheck(
+                    "wine", label, CheckStatus.ERROR, f"No se pudo crear un prefijo: {exc}",
+                    "Revisa la instalación de Wine.",
+                )  # fmt: skip
+        manager = prefixes if temporary is None else probe_prefixes
+        result = manager.run_test_program(prefix, bits)
+    finally:
+        if temporary is not None:
+            probe_prefixes.delete(temporary)
+    if result.ok:
+        return RequirementCheck(
+            "wine", label, CheckStatus.OK, f"Ejecuta programas de {bits} bits ({where})"
+        )
+    return RequirementCheck(
+        "wine", label, CheckStatus.ERROR, f"No ejecuta programas de {bits} bits ({where})", hint
+    )

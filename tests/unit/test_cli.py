@@ -372,7 +372,40 @@ def test_check_ready(fake_wine, user_profile, make_game, capsys):
     assert "[ok]     OpenGL de 32 bits: libGL.so.1" in out
     assert "%USERPROFILE%/Saved Games/Prueba" in out
     assert "- Va lento" in out
+    assert "[ok]     Wine de 32 bits: Ejecuta programas de 32 bits (prefijo temporal)" in out
     assert "Listo para jugar: sí" in out
+
+
+def test_check_without_32_bit_wine_is_not_ready(fake_wine, xdg_tmp, make_game, capsys):
+    """Con wine64 sin wine32:i386, Wine existe pero no ejecuta Pokémon Z."""
+    from test_prefix_manager import FakeWine
+
+    fake_wine["fake"] = FakeWine(program_code=1)
+
+    code = main(["check", str(make_game(exe="mkxp-z"))])
+    out = capsys.readouterr().out
+
+    assert code == EXIT_NOT_DETECTED
+    assert "[ERROR]  Wine de 32 bits: No ejecuta programas de 32 bits" in out
+    assert "wine32:i386" in out
+    assert "Listo para jugar: no" in out
+    # El prefijo temporal se borra aunque la prueba falle.
+    probe = xdg_tmp / "cache" / "pokemon-to-linux" / "probe"
+    assert not probe.exists() or not any(probe.iterdir())
+
+
+def test_check_reuses_the_game_prefix(fake_wine, xdg_tmp, make_game, capsys):
+    from pokemon_to_linux import cli
+
+    wine = cli.WineManager().detect()
+    prefixes = cli.PrefixManager(xdg_tmp / "data" / "pokemon-to-linux" / "prefixes", wine)
+    prefixes.create("juego-de-prueba", "win64")
+    fake_wine["fake"].calls.clear()
+
+    assert main(["check", str(make_game(exe="mkxp-z"))]) == 0
+
+    assert "(prefijo juego-de-prueba)" in capsys.readouterr().out
+    assert ["wineboot", "--init"] not in fake_wine["fake"].commands()
 
 
 def test_check_not_ready(no_wine, host, make_game, capsys):
@@ -403,7 +436,7 @@ def test_check_json(fake_wine, user_profile, make_game, capsys):
     assert data["profile"]["id"] == "prueba"
     assert data["profile"]["status"] == "partial"
     assert data["profile"]["known_issues"][0]["id"] == "lento"
-    assert [c["id"] for c in data["checks"]] == ["display", "opengl", "filesystem"]
+    assert [c["id"] for c in data["checks"]] == ["display", "opengl", "filesystem", "wine"]
     assert data["wine"] == "wine-9.0"
 
 
