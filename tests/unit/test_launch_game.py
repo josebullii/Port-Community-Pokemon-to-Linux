@@ -185,3 +185,11 @@ def test_without_matching_profile(make_game, prefixes):
     assert plan.save_dirs == ()
     assert plan.config_dirs == ()
     assert plan.spec.environment["WINEDEBUG"] == GAME_WINEDEBUG
+
+
+def test_analysis_of_another_folder_is_rejected(make_game, prefixes):
+    from pokemon_to_linux.application.analyze_game import analyze_game
+
+    other = analyze_game(make_game())
+    with pytest.raises(ValueError, match="el análisis es de"):
+        prepare_launch(make_game(), wine=WINE, prefixes=pm(prefixes, FakeWine()), analysis=other)

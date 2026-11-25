@@ -98,6 +98,8 @@ def prepare_launch(
     """
     if analysis is None:
         analysis = analyze_game(game_path)
+    elif Path(game_path).resolve() != analysis.path.resolve():
+        raise ValueError(f"el análisis es de {analysis.path}, no de {game_path}")
     detection = analysis.detection
     if not detection.detected:
         raise LaunchError(
