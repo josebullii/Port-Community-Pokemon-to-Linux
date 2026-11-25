@@ -126,6 +126,21 @@ Las instrucciones de paquetes para Fedora y Arch que da la aplicación no se han
 
 Para repetir la prueba automática de arranque: `PTL_POKEMON_Z_PATH=… xvfb-run -a pytest -m realgame` (ver [development.md](development.md#pruebas-con-juegos-reales)).
 
+### Pruebas desde la interfaz (sprint 5)
+
+Mismo entorno, con la interfaz en un Xvfb (`tools/manual-test/drive.sh gui`) y sin usar la terminal para jugar:
+
+| Paso | Resultado | Notas |
+|---|---|---|
+| Añadir la carpeta con «Añadir juego…» | ✅ | Reconoce Pokémon Z, su perfil (🟧 Parcial) y sus problemas conocidos |
+| Ficha: requisitos | ✅ | Sesión gráfica, OpenGL de 32 bits (mesa) y ext4: «Listo para jugar» |
+| «Jugar» sin prefijo (usuario nuevo) | ✅ | Crea el prefijo y prueba Wine de 32 bits; unos 25 s hasta la pantalla de título |
+| «Jugar» con el prefijo de la CLI | ✅ | Usa el mismo prefijo (`pokemon-z`): «Continuar» carga la partida guardada en el sprint 4 |
+| «Detener» | ✅ | El juego se cierra; el historial dice «detenido desde la aplicación» |
+| Carpeta de partidas | ✅ | Tras el primer lanzamiento, la ficha muestra la ruta dentro del prefijo |
+
+Las funciones del juego (combate, audio) siguen sin comprobar: el estado no cambia.
+
 ### Contenido de la carpeta
 
 Datos obtenidos al analizar los archivos del juego:

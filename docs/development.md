@@ -82,6 +82,8 @@ pokemon-to-linux-cli check "/ruta/a/POKEMON Z V2.19"
 
 Pokémon Z funciona en WSL2 con WSLg (Ubuntu 24.04), con OpenGL por software (llvmpipe). Copia el juego al sistema de ficheros de Linux (p. ej. `~/Juegos`): desde `/mnt/c` tarda unos 2,5 minutos en mostrar el título.
 
+Con WSLg, Qt abre la ventana de la aplicación con Wayland y el juego (Wine) con X11 (`DISPLAY=:0`); las dos salen en el escritorio de Windows.
+
 ## Puesta en marcha
 
 ```bash
@@ -116,6 +118,10 @@ Las pruebas de Qt usan `QT_QPA_PLATFORM=offscreen`, que se fija en `tests/confte
 | `_reset_app_logger` | (automática) Cierra los handlers del log tras cada prueba |
 | `make_pe` | Construye un ejecutable PE mínimo y válido (arquitectura, DLL importadas, marcadores) |
 | `make_game` | Crea una carpeta de juego RPG Maker XP falsa y configurable (INI, exe, DLL, `Data/`…). Con `exe="runnable"`, `Game.exe` es un programa real de 32 bits que termina con código 7 |
+| `FakeWine` | (clase) Sustituye a `wine`/`wineserver` en `PrefixManager`: `wineboot` crea `system.reg` y los `.exe` terminan con el código que se le indique |
+| `wait_until` | (función) Procesa eventos de Qt hasta que se cumple una condición; para las tareas en segundo plano de la interfaz |
+
+Las pruebas de la página Biblioteca (`tests/integration/test_library_page.py`) recorren el flujo completo con `FakeWine` y el intérprete de Python como «Wine»: añadir, comprobar, preparar el prefijo, lanzar, detener y guardar en el historial.
 
 ### Archivos de juegos en las pruebas
 
@@ -131,6 +137,29 @@ PTL_POKEMON_Z_PATH="/ruta/a/POKEMON Z V2.19" xvfb-run -a pytest -m realgame   # 
 ```
 
 `test_pokemon_z_starts_with_wine` lanza el juego con su perfil en un **prefijo temporal** (nunca el tuyo, que tiene tus partidas), espera a que cree la ventana OpenGL, comprueba que sigue en marcha sin problemas en la salida y lo cierra. Tarda unos 2 minutos.
+
+### Pruebas manuales en una pantalla virtual
+
+`tools/manual-test/drive.sh` lanza el juego o la interfaz en un Xvfb y los maneja con teclas, clics y capturas. Así se recorre la [lista de funciones](compatibility.md#funciones-que-hay-que-probar) sin monitor (WSL, SSH, un servidor). Necesita `xvfb xdotool x11-apps imagemagick`:
+
+```bash
+export PTL_GAME=~/Juegos/"POKEMON Z V2.19" PTL_OUT=~/capturas
+tools/manual-test/drive.sh start                       # Xvfb :95 y el juego con «run»
+tools/manual-test/drive.sh keys w:5 Return w:3 Return  # título → «Continuar»
+tools/manual-test/drive.sh shot continuar              # ~/capturas/continuar.png
+tools/manual-test/drive.sh stop
+
+tools/manual-test/drive.sh gui                         # la interfaz, en vez del juego
+tools/manual-test/drive.sh click 300 56                # «Añadir juego…»
+tools/manual-test/drive.sh type "$PTL_GAME"            # en el diálogo de carpetas
+tools/manual-test/drive.sh screen biblioteca           # toda la pantalla
+```
+
+Notas:
+- La interfaz se lanza con `QT_QPA_PLATFORM=xcb`: con WSLg, Qt elegiría Wayland y la ventana no saldría en el Xvfb.
+- En WSL, Xvfb solo escucha en un socket abstracto (`@/tmp/.X11-unix/X95`), porque `/tmp/.X11-unix` es de WSLg. La comprobación de la sesión gráfica lo tiene en cuenta.
+- En WSL, al manejar la interfaz desde Windows con varias llamadas a `wsl.exe`, a veces se cerraba al terminar una de ellas, aunque se lanzara con `setsid` (no se ha averiguado por qué). Con otra sesión abierta todo el rato (`wsl.exe -- sleep 3600`) no volvió a pasar.
+- Sin gestor de ventanas, `drive.sh screen` puede mostrar en negro un diálogo que sí funciona; `drive.sh shot` (o `xwd -id`) lo captura bien.
 
 ## Analizar un juego desde la terminal
 
@@ -150,11 +179,14 @@ pokemon-to-linux-cli check "/ruta/al/juego"  # ¿está todo listo para jugar? (-
 pokemon-to-linux-cli run "/ruta/al/juego"    # prepara el prefijo y lanza el juego
 pokemon-to-linux-cli run "/ruta/al/juego" --arch win32 --id mi-juego --timeout 60
 pokemon-to-linux-cli profiles                # perfiles de compatibilidad cargados
+pokemon-to-linux-cli library                 # juegos de la biblioteca (add <carpeta>, remove <id>)
 ```
 
 `check` devuelve `0` si el juego está listo para jugar y `1` si falta algo. Además de la sesión gráfica, OpenGL y el sistema de ficheros, ejecuta el programa de prueba con los bits del juego: en el prefijo del juego si ya existe (unos segundos) o en uno temporal que borra después. Así, `wine64` sin `wine32:i386` da «Listo para jugar: no» en vez de fallar al lanzar.
 
 `run` comprueba primero los requisitos del sistema. Si falta uno imprescindible (p. ej. OpenGL de 32 bits), explica cómo instalarlo y no lanza el juego; `--ignore-checks` lo lanza igualmente. Después aplica el perfil del juego, muestra dónde están las partidas y, al terminar, los problemas reconocidos en la salida con su solución.
+
+Si la carpeta está en la biblioteca, `run` usa el identificador del juego en la biblioteca (y con él, su prefijo), también para una segunda copia del mismo juego (`pokemon-z-2`), y guarda el lanzamiento en su historial. `run` no crea la base de datos si no existe.
 
 `run` devuelve el código de salida del juego. Si no terminó normalmente devuelve `1`, y si no se pudo lanzar, `2`.
 
@@ -165,6 +197,7 @@ Ctrl+C:
 - **Prefijos**: `~/.local/share/pokemon-to-linux/prefixes/<id>`. Las partidas suelen estar dentro (`drive_c/users/<usuario>/…`): no borres un prefijo sin copiarlas antes.
 - **Perfiles del usuario**: `~/.config/pokemon-to-linux/profiles/*.toml` ([formato](profiles.md)).
 - **Log de cada lanzamiento**: `~/.local/state/pokemon-to-linux/logs/games/<id>/<fecha>.log`. Se conservan los últimos 20 por juego.
+- **Biblioteca**: `~/.local/share/pokemon-to-linux/library.sqlite3`. El esquema se actualiza solo al abrirla (`PRAGMA user_version`); una biblioteca de una versión más nueva de la aplicación no se toca.
 
 ## Integración continua
 
