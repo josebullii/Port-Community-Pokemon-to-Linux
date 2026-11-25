@@ -59,6 +59,18 @@ SLOW_FILESYSTEMS = {
 def check_display(host: HostSystem) -> RequirementCheck:
     label = "Sesión gráfica"
     if display := host.x11_display:
+        if host.x11_server_listening() is False:
+            # Aviso y no error: si /proc/net/unix no fuera fiable (contenedores),
+            # mejor dejar jugar que bloquear por un falso negativo.
+            return RequirementCheck(
+                "display",
+                label,
+                CheckStatus.WARNING,
+                f"DISPLAY={display}, pero no hay ningún servidor X escuchando en "
+                f"{host.x11_socket()}",
+                "Lanza el juego desde tu sesión de escritorio. En WSL, comprueba que "
+                "WSLg funciona (wsl --update).",
+            )
         return RequirementCheck("display", label, CheckStatus.OK, f"X11 en {display}")
     if host.wayland_display:
         return RequirementCheck(

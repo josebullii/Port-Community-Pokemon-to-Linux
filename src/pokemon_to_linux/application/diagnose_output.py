@@ -69,6 +69,15 @@ GENERIC_ISSUES = (
 )
 
 
+def find_issue(issue_id: str, profile: GameProfile | None = None) -> KnownIssue | None:
+    """El problema conocido con ese id: primero los del perfil, luego los generales.
+
+    Sirve para explicar los problemas guardados en el historial de lanzamientos.
+    """
+    issues = [*(profile.known_issues if profile else ()), *GENERIC_ISSUES]
+    return next((i for i in issues if i.id == issue_id), None)
+
+
 @dataclass(frozen=True, slots=True)
 class Finding:
     issue: KnownIssue

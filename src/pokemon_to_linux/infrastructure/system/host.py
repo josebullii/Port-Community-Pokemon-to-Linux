@@ -8,6 +8,7 @@ en vez de suponer que falta: un requisito desconocido no debe bloquear.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from collections.abc import Callable, Mapping
@@ -81,6 +82,10 @@ def filesystem_of(path: PurePath, mounts: list[tuple[str, str]]) -> str | None:
     return best[1] if best else None
 
 
+X11_SOCKET_DIR = Path("/tmp/.X11-unix")  # noqa: S108 - ruta estándar de X11
+_LOCAL_DISPLAY = re.compile(r"(?:unix)?:(\d+)(?:\.\d+)?")
+
+
 class HostSystem:
     """Información del sistema. Las dependencias se pueden sustituir en las pruebas."""
 
@@ -91,11 +96,15 @@ class HostSystem:
         which: Callable[[str], str | None] = shutil.which,
         ldconfig_locations: tuple[str, ...] = LDCONFIG_LOCATIONS,
         mounts_file: Path = Path("/proc/self/mounts"),
+        x11_socket_dir: Path | None = X11_SOCKET_DIR,
+        unix_sockets_file: Path = Path("/proc/net/unix"),
     ) -> None:
         self._env = os.environ if env is None else env
         self._which = which
         self._ldconfig_locations = ldconfig_locations
         self._mounts_file = mounts_file
+        self._x11_socket_dir = x11_socket_dir
+        self._unix_sockets_file = unix_sockets_file
 
     def _ldconfig(self) -> str | None:
         if found := self._which("ldconfig"):
@@ -145,6 +154,38 @@ class HostSystem:
     @property
     def x11_display(self) -> str | None:
         return self._env.get("DISPLAY") or None
+
+    def x11_socket(self) -> Path | None:
+        """Socket del servidor X de ``DISPLAY`` si es local (``:0``, ``:1.0``, ``unix:0``).
+
+        ``None`` si no se puede saber: pantalla remota (``localhost:10.0`` con
+        ``ssh -X``) o sin carpeta de sockets que mirar.
+        """
+        display = self.x11_display
+        if not display or self._x11_socket_dir is None:
+            return None
+        match = _LOCAL_DISPLAY.fullmatch(display)
+        return self._x11_socket_dir / f"X{match.group(1)}" if match else None
+
+    def x11_server_listening(self) -> bool | None:
+        """¿Hay un servidor X escuchando en el socket de ``DISPLAY``? ``None`` si no se sabe.
+
+        El servidor puede escuchar solo en un socket abstracto (``@/tmp/.X11-unix/X1``),
+        sin fichero: pasa con Xvfb en WSL, donde ``/tmp/.X11-unix`` es de WSLg.
+        Los abstractos se ven en ``/proc/net/unix``.
+        """
+        socket = self.x11_socket()
+        if socket is None:
+            return None
+        if socket.exists():
+            return True
+        try:
+            table = self._unix_sockets_file.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return None
+        name = socket.as_posix()
+        return any(line.split()[-1] in (name, f"@{name}") for line in table.splitlines()[1:]
+                   if line.split())  # fmt: skip
 
     @property
     def wayland_display(self) -> str | None:

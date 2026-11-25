@@ -43,6 +43,13 @@ def test_window_shows_without_errors(window, qapp):
 def _diagnostics_text(window):
     from PySide6.QtWidgets import QLabel
 
+    from conftest import wait_until
+    from pokemon_to_linux.ui.diagnostics_page import CHECKING
+
+    diagnostics = window.diagnostics
+    wait_until(
+        lambda: CHECKING not in (diagnostics.wine_label.text(), diagnostics.opengl_label.text())
+    )
     page = window.pages.widget(1)
     return " ".join(label.text() for label in page.findChildren(QLabel))
 
@@ -50,7 +57,9 @@ def _diagnostics_text(window):
 def test_diagnostics_shows_wine_not_installed(qapp, tmp_path, monkeypatch):
     from pokemon_to_linux.ui.main_window import MainWindow
 
-    monkeypatch.setattr("pokemon_to_linux.ui.main_window.WineManager.detect", lambda self: None)
+    monkeypatch.setattr(
+        "pokemon_to_linux.ui.diagnostics_page.WineManager.detect", lambda self: None
+    )
     win = MainWindow(AppPaths.from_environment(env={}, home=tmp_path))
 
     assert "no instalado" in _diagnostics_text(win)
@@ -64,7 +73,9 @@ def test_diagnostics_shows_wine_version(qapp, tmp_path, monkeypatch):
     from pokemon_to_linux.ui.main_window import MainWindow
 
     wine = WineInstallation(Path("/usr/bin/wine"), None, "9.0", None, "wine-9.0 (Ubuntu)")
-    monkeypatch.setattr("pokemon_to_linux.ui.main_window.WineManager.detect", lambda self: wine)
+    monkeypatch.setattr(
+        "pokemon_to_linux.ui.diagnostics_page.WineManager.detect", lambda self: wine
+    )
     win = MainWindow(AppPaths.from_environment(env={}, home=tmp_path))
 
     assert "wine-9.0 (Ubuntu)" in _diagnostics_text(win)
@@ -78,7 +89,7 @@ def test_diagnostics_shows_wine_error(qapp, tmp_path, monkeypatch):
     def broken(self):
         raise WineError("wine --version falló")
 
-    monkeypatch.setattr("pokemon_to_linux.ui.main_window.WineManager.detect", broken)
+    monkeypatch.setattr("pokemon_to_linux.ui.diagnostics_page.WineManager.detect", broken)
     win = MainWindow(AppPaths.from_environment(env={}, home=tmp_path))
 
     assert "error: wine --version falló" in _diagnostics_text(win)
@@ -117,3 +128,19 @@ def test_diagnostics_shows_opengl(qapp, tmp_path, monkeypatch, libraries, expect
     assert expected in text
     assert "OpenGL de 64 bits" in text
     win.deleteLater()
+
+
+def test_diagnostics_can_be_refreshed(window, monkeypatch):
+    from pokemon_to_linux.ui.diagnostics_page import CHECKING
+
+    _diagnostics_text(window)
+    monkeypatch.setattr(
+        "pokemon_to_linux.ui.diagnostics_page.WineManager.detect", lambda self: None
+    )
+
+    window.diagnostics.refresh_button.click()
+    assert window.diagnostics.wine_label.text() == CHECKING
+    assert not window.diagnostics.refresh_button.isEnabled()
+
+    assert "no instalado" in _diagnostics_text(window)
+    assert window.diagnostics.refresh_button.isEnabled()

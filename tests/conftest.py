@@ -1,9 +1,12 @@
 import logging
 import os
+from pathlib import Path
 
 import pytest
 
 from pokemon_to_linux.infrastructure.logging.logger import ROOT_LOGGER_NAME
+from pokemon_to_linux.infrastructure.wine.prefix_manager import TEST_EXIT_CODE
+from pokemon_to_linux.infrastructure.wine.wine_manager import CommandResult
 
 # Permite ejecutar las pruebas de Qt sin pantalla (CI, SSH, consola).
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -15,6 +18,19 @@ def qapp():
     QtWidgets = pytest.importorskip("PySide6.QtWidgets")  # noqa: N806
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
     yield app
+
+
+def wait_until(predicate, timeout=5.0):
+    """Procesa eventos de Qt hasta que ``predicate()`` sea cierto (tareas en segundo plano)."""
+    import time
+
+    from PySide6.QtCore import QCoreApplication, QEventLoop
+
+    deadline = time.monotonic() + timeout
+    while not predicate():
+        if time.monotonic() > deadline:
+            raise AssertionError("no se cumplió la condición a tiempo")
+        QCoreApplication.processEvents(QEventLoop.ProcessEventsFlag.AllEvents, 50)
 
 
 @pytest.fixture(autouse=True)
@@ -183,3 +199,33 @@ def xdg_tmp(tmp_path, monkeypatch):
     ):
         monkeypatch.setenv(var, str(tmp_path / sub))
     return tmp_path
+
+
+class FakeWine:  # noqa: D101
+    """Simula wine/wineserver: wineboot crea system.reg con la arquitectura pedida."""
+
+    def __init__(self, *, wineboot_code=0, created_arch=None, program_code=TEST_EXIT_CODE):
+        self.calls = []
+        self.wineboot_code = wineboot_code
+        self.created_arch = created_arch
+        self.program_code = program_code
+
+    def __call__(self, args, env, timeout, cwd):
+        self.calls.append((list(args), dict(env)))
+        prefix = Path(env["WINEPREFIX"])
+        if args[1:] == ["wineboot", "--init"]:
+            if self.wineboot_code == 0:
+                prefix.mkdir(parents=True, exist_ok=True)
+                arch = self.created_arch or env.get("WINEARCH", "win64")
+                (prefix / "system.reg").write_text(
+                    "WINE REGISTRY Version 2\n;; All keys relative to \\\\Machine\n\n"
+                    f"#arch={arch}\n"
+                )
+            return CommandResult(self.wineboot_code, "err:wineboot: algo falló\n")
+        if args[0].endswith(".exe") or (len(args) > 1 and args[1].endswith(".exe")):
+            return CommandResult(self.program_code, "")
+        return CommandResult(0, "")
+
+    def commands(self):
+        return [args[1:] if "wineserver" not in args[0] else ["wineserver", *args[1:]]
+                for args, _ in self.calls]  # fmt: skip

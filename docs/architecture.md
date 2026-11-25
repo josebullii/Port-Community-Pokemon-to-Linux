@@ -27,7 +27,7 @@ Pokémon to Linux es un lanzador y gestor de compatibilidad. No reescribe los ju
 | `main.py` | Punto de entrada: rutas XDG, logging, `QApplication`, ventana | 1 ✅ |
 | `config.py` | `AppPaths`: rutas XDG de la app (datos, config, caché, estado, prefijos, BD, logs) | 1 ✅ |
 | `infrastructure/logging/` | Log rotativo en fichero + consola, `excepthook` global | 1 ✅ |
-| `ui/main_window.py` | Ventana principal: Biblioteca, Diagnóstico, Acerca de | 1 ✅ |
+| `ui/main_window.py` | Ventana principal: Biblioteca, Diagnóstico, Acerca de. Abre la biblioteca y pide confirmación al cerrar con un juego en marcha | 1-5 ✅ |
 | `infrastructure/filesystem/game_scanner.py` | `GameScanner`: inventario de la carpeta. Búsquedas sin distinguir mayúsculas, sin seguir enlaces simbólicos ni junctions de NTFS, y con límite de ficheros | 2 ✅ |
 | `domain/dependencies.py` | Clasifica las DLL importadas: incluidas, de sistema, redistribuibles o que faltan | 2 ✅ |
 | `infrastructure/filesystem/ini_reader.py` | Lectura de `Game.ini`: detecta UTF-8, Shift-JIS o cp1252 y normaliza claves | 2 ✅ |
@@ -51,8 +51,15 @@ Pokémon to Linux es un lanzador y gestor de compatibilidad. No reescribe los ju
 | `application/check_requirements.py` | Sesión gráfica, OpenGL con los bits del juego, sistema de ficheros lento y `check_wine_bits` (programa de prueba con los bits del juego) | 4 ✅ |
 | `application/diagnose_output.py` | `OutputDiagnoser`: problemas conocidos en la salida del juego | 4 ✅ |
 | `cli.py` | Comandos `check` y `profiles`; `run` comprueba requisitos y diagnostica | 4 ✅ |
-| `infrastructure/database/` | Conexión SQLite y repositorios | 5 |
-| `application/` (resto) | Casos de uso para añadir y configurar juegos | 5 |
+| `domain/game.py` | `Game` (su id es también el de su prefijo) y `LaunchRecord` | 5 ✅ |
+| `infrastructure/database/connection.py` | `open_database`: SQLite con claves foráneas y migraciones por `PRAGMA user_version` | 5 ✅ |
+| `infrastructure/database/game_repository.py` | `GameRepository`: juegos y lanzamientos; totales calculados del historial | 5 ✅ |
+| `application/library.py` | `Library` (añadir, renombrar, quitar, registrar lanzamientos) e `inspect_game` (análisis, perfil, requisitos y partidas, sin base de datos) | 5 ✅ |
+| `ui/tasks.py` | `TaskRunner`: funciones en el `QThreadPool` con el resultado entregado en el hilo principal | 5 ✅ |
+| `ui/library_page.py` | Página Biblioteca: añadir, comprobar, jugar, detener, quitar y abrir carpetas | 5 ✅ |
+| `ui/game_details.py` | Ficha del juego: estado, requisitos, partidas, historial, problemas y acciones | 5 ✅ |
+| `ui/diagnostics_page.py` | Página Diagnóstico: versiones, rutas, Wine y OpenGL (en segundo plano) | 5 ✅ |
+| `cli.py` | Comando `library`; `run` usa el id de la biblioteca y guarda el lanzamiento | 5 ✅ |
 
 ## Detección de motor (sprint 2)
 
@@ -158,9 +165,7 @@ Decisiones, comprobadas con Wine 9.0 en Ubuntu 24.04:
 
 Comprobado con Wine real (prueba `test_stop_game_closes_game_and_secondary_processes`): `stop_game` cierra el juego y otro programa lanzado aparte en el mismo prefijo antes de que actúe el cierre forzado, y después no queda ningún proceso en el prefijo.
 
-**Pendiente para el sprint 5 (interfaz):**
-- La página "Diagnóstico" ejecuta `wine --version` y `ldconfig -p` (OpenGL, desde el sprint 4) en el hilo de la interfaz. Tardan milisegundos, pero si se colgaran bloquearían la ventana hasta 30 y 15 s.
-- `prepare_launch` puede tardar segundos (crear el prefijo) y tendrá que ejecutarse en un hilo de trabajo.
+Lo que quedaba pendiente para la interfaz (`wine --version`, `ldconfig -p` y `prepare_launch` en el hilo de la interfaz) se resolvió en el sprint 5 con `TaskRunner`.
 
 ### Programa de prueba
 
@@ -191,6 +196,33 @@ Decisiones, comprobadas con Pokémon Z en Ubuntu 24.04 (WSL2) y Wine 9.0:
 | **Las partidas están dentro del prefijo** | Pokémon Essentials guarda en `%USERPROFILE%\Saved Games\<juego>`, que con Wine es `<prefijo>/drive_c/users/<usuario>/Saved Games/<juego>`. El perfil lo declara y `run` lo muestra: borrar el prefijo borraría las partidas. |
 | **`WINEDEBUG=fixme-all` al jugar** | Con `-all` se perdían los `err` de Wine, que dicen la causa exacta (p. ej. `Failed to load libGL`). Los `fixme` siguen ocultos porque son ruido. |
 | **Problemas del perfil antes que los generales** | Así un perfil puede declarar como inofensivo (`harmless`) un mensaje que en general sería un error: en Pokémon Z, las DLL que le faltan a `fluidsynth.dll` (no tiene MIDI). |
+
+## Biblioteca e interfaz (sprint 5)
+
+```
+Añadir juego…  ─► [hilo] analyze_game ─► Library.add ─► SQLite
+Seleccionar    ─► [hilo] inspect_game  (perfil, requisitos, partidas)
+Jugar          ─► [hilo] Wine + analyze_game + check_requirements
+                    └─ ¿falta algo imprescindible? → preguntar
+               ─► [hilo] prepare_launch (prefijo y programa de prueba)
+               ─► launch_game + OutputDiagnoser
+Al terminar    ─► Library.record_launch ─► historial y ficha actualizados
+```
+
+Decisiones:
+
+| Decisión | Motivo |
+|---|---|
+| **Todo lo lento, en `TaskRunner`; la base de datos, en el hilo principal** | Analizar 19.000 ficheros, `ldconfig`, `wine --version` o crear un prefijo congelarían la ventana. Una conexión `sqlite3` solo vale en el hilo que la abrió, así que las tareas devuelven datos y el hilo principal los guarda. |
+| **El resultado de las tareas pasa por un `QObject` del hilo principal** | Si la señal del hilo de trabajo se conectara a una función de Python suelta, Qt podría ejecutarla en ese hilo. `TaskRunner._deliver` vive en el hilo principal y Qt encola la llamada (lo comprueba `test_tasks.py`). |
+| **El id del juego es el nombre de su prefijo** | La interfaz y `run` usan el mismo prefijo, y con él las mismas partidas. Una segunda copia del mismo juego recibe `id-2`: si compartieran prefijo, cada una vería las partidas de la otra. |
+| **Quitar un juego no borra nada del disco** | El prefijo tiene las partidas. Si se vuelve a añadir la carpeta, recupera su id y sus partidas. |
+| **Una comprobación antigua no pisa a una nueva** | Cada comprobación lleva un número; al llegar, se descarta si ya hay otra más reciente. Lo destapó una prueba: la primera comprobación (sin prefijo) llegaba después de la segunda. |
+| **Preguntar, no impedir, si falta un requisito** | Igual que `--ignore-checks` en la CLI: el usuario puede saber algo que la comprobación no ve. |
+| **Texto del juego siempre escapado** | Los títulos y rutas vienen del juego: en la ficha (HTML) se escapan; las etiquetas simples usan texto plano. |
+| **Servidor X: fichero o socket abstracto** | Con Xvfb en WSL no hay fichero en `/tmp/.X11-unix` (es de WSLg): el servidor solo escucha en `@/tmp/.X11-unix/X96`, que se ve en `/proc/net/unix`. |
+
+Comprobado con Pokémon Z en Ubuntu 24.04 (WSL2), en un Xvfb: añadir la carpeta desde el diálogo, ficha con el perfil y «Listo para jugar», «Jugar» con el prefijo recién creado (unos 25 s hasta el título), «Continuar» con una partida guardada, «Detener» y el historial actualizado.
 
 ## Principios
 

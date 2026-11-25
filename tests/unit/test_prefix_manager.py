@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from conftest import FakeWine  # noqa: F401 - la reexportan otras pruebas
 from pokemon_to_linux.infrastructure.wine.prefix_manager import (
     TEST_EXIT_CODE,
     Prefix,
@@ -25,36 +26,6 @@ WINE = WineInstallation(
     flavor=None,
     description="wine-9.0",
 )
-
-
-class FakeWine:
-    """Simula wine/wineserver: wineboot crea system.reg con la arquitectura pedida."""
-
-    def __init__(self, *, wineboot_code=0, created_arch=None, program_code=TEST_EXIT_CODE):
-        self.calls = []
-        self.wineboot_code = wineboot_code
-        self.created_arch = created_arch
-        self.program_code = program_code
-
-    def __call__(self, args, env, timeout, cwd):
-        self.calls.append((list(args), dict(env)))
-        prefix = Path(env["WINEPREFIX"])
-        if args[1:] == ["wineboot", "--init"]:
-            if self.wineboot_code == 0:
-                prefix.mkdir(parents=True, exist_ok=True)
-                arch = self.created_arch or env.get("WINEARCH", "win64")
-                (prefix / "system.reg").write_text(
-                    "WINE REGISTRY Version 2\n;; All keys relative to \\\\Machine\n\n"
-                    f"#arch={arch}\n"
-                )
-            return CommandResult(self.wineboot_code, "err:wineboot: algo falló\n")
-        if args[0].endswith(".exe") or (len(args) > 1 and args[1].endswith(".exe")):
-            return CommandResult(self.program_code, "")
-        return CommandResult(0, "")
-
-    def commands(self):
-        return [args[1:] if "wineserver" not in args[0] else ["wineserver", *args[1:]]
-                for args, _ in self.calls]  # fmt: skip
 
 
 @pytest.fixture

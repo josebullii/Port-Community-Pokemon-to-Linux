@@ -5,7 +5,7 @@
 
 Lanzador y gestor de compatibilidad para ejecutar en Linux **fangames de Pokémon creados para Windows**, empezando por **Pokémon Z** (RPG Maker XP / Pokémon Essentials). El objetivo final es que también funcionen en consolas portátiles Linux como la **Anbernic R36S**.
 
-> **Estado:** sprint 4 completado: **Pokémon Z se ejecuta en Linux con Wine**. Se ha probado en Ubuntu 24.04 sobre WSL2, con OpenGL por software (pantalla de título, menús, exploración, guardar y cargar partida); faltan el combate, el audio y un Linux nativo con GPU. La aplicación reconoce el juego por su perfil de compatibilidad, comprueba que el sistema tiene lo necesario (Wine y OpenGL de 32 bits), lanza el juego en su propio prefijo y explica los problemas conocidos que aparezcan. Por ahora se hace desde la terminal (`pokemon-to-linux-cli check` y `run`). El sprint 5 traerá la biblioteca y la interfaz gráfica completa.
+> **Estado:** sprint 5 completado: **se puede jugar a Pokémon Z sin abrir una terminal**. En la ventana de la aplicación se añade la carpeta del juego, se ve si está listo para jugar (y qué falta si no), se pulsa «Jugar» y, al terminar, queda en el historial con los problemas reconocidos. La aplicación reconoce el juego por su perfil de compatibilidad, comprueba Wine y OpenGL de 32 bits, prepara un prefijo propio para el juego y lo lanza. Se ha probado en Ubuntu 24.04 sobre WSL2, con OpenGL por software (título, menús, exploración, guardar y cargar partida); faltan el combate, el audio y un Linux nativo con GPU. El sprint 6 se centra en estabilizar y publicar la versión 0.1.
 
 ---
 
@@ -86,7 +86,7 @@ Arquitectura modular por capas. La interfaz nunca invoca Wine directamente: pide
 | Lint y formato | Ruff |
 | Distribución | Por decidir después del MVP (posible Flatpak; paquete para PortMaster / R36S) |
 
-### Estructura del repositorio (prevista)
+### Estructura del repositorio
 
 ```
 Port-Community-Pokemon-to-Linux/
@@ -94,9 +94,9 @@ Port-Community-Pokemon-to-Linux/
 ├── .github/workflows/ci.yml
 ├── src/pokemon_to_linux/
 │   ├── main.py, config.py
-│   ├── ui/              # main_window, library_page, add_game_dialog, settings
-│   ├── application/     # add_game, analyze_game, configure_game, launch_game, stop_game
-│   ├── domain/          # game, engine, profile, compatibility
+│   ├── ui/              # main_window, library_page, game_details, diagnostics_page, tasks
+│   ├── application/     # analyze_game, library, check_requirements, launch_game, diagnose_output
+│   ├── domain/          # game, profile, compatibility, requirements, dependencies
 │   ├── infrastructure/
 │   │   ├── database/    # connection, repositories
 │   │   ├── wine/        # wine_manager, prefix_manager, process_manager
@@ -106,7 +106,8 @@ Port-Community-Pokemon-to-Linux/
 │   ├── engines/         # base, detector, rpgmaker_xp/
 │   ├── profiles/        # perfiles de compatibilidad integrados (*.toml)
 │   └── resources/       # icons, styles
-├── tests/               # unit, integration, fixtures
+├── tests/               # unit, integration
+├── tools/manual-test/   # drive.sh: pruebas manuales en una pantalla virtual
 └── docs/                # architecture, compatibility, development, profiles
 ```
 
@@ -162,28 +163,28 @@ Las decisiones técnicas están detalladas en [docs/architecture.md](docs/archit
 
 ### Modelo de datos (SQLite)
 
-| Tabla | Campos principales |
-|---|---|
-| `games` | id, name, game_path, executable, engine_id, created_at |
-| `engines` | id, name, version |
-| `profiles` | id, game_id, wine_version, prefix_path, architecture, configuration |
-| `launch_history` | id, game_id, started_at, ended_at, exit_code, status |
+La biblioteca está en `~/.local/share/pokemon-to-linux/library.sqlite3`:
 
-Las partidas guardadas se quedan en el formato y la ubicación que usa el propio juego. SQLite no las almacena.
+| Tabla | Campos |
+|---|---|
+| `games` | id (también el nombre de su prefijo de Wine), name, path, engine, runtime, bits, added_at |
+| `launches` | id, game_id, started_at, duration, state, exit_code, error, log_file, problems |
+
+Los perfiles de compatibilidad no van en la base de datos: son ficheros TOML ([formato](docs/profiles.md)). Las veces jugado, el tiempo de juego y la última vez se calculan del historial. Las partidas guardadas se quedan en el formato y la ubicación que usa el propio juego; SQLite no las almacena.
 
 ---
 
 ## Flujo de uso
 
 1. **Seleccionar**: el usuario elige la carpeta del juego.
-2. **Analizar**: el escáner revisa los archivos, la configuración y los ejecutables.
-3. **Identificar**: se propone el motor, con su nivel de confianza y las advertencias.
-4. **Verificar**: se comprueban Wine (o mkxp-z), la arquitectura y las dependencias.
-5. **Preparar**: se crea el prefijo y se aplica la configuración inicial.
-6. **Probar**: se lanza el juego y se recoge el diagnóstico.
-7. **Guardar**: el juego, el perfil y el resultado se registran en SQLite.
+2. **Analizar**: el escáner revisa los archivos, la configuración y los ejecutables, y reconoce el motor.
+3. **Guardar**: el juego se añade a la biblioteca (SQLite) solo si se reconoce el motor.
+4. **Verificar**: se busca su perfil de compatibilidad y se comprueban la sesión gráfica, OpenGL con los bits del juego y la carpeta.
+5. **Preparar**: al jugar, se comprueba Wine, se crea el prefijo la primera vez y se prueba que ejecuta los bits del juego.
+6. **Jugar**: se lanza el juego y se reconocen los problemas conocidos en su salida.
+7. **Registrar**: el resultado y los problemas quedan en el historial del juego.
 
-La interfaz muestra estados precisos: *no analizado, detectado, configurado, probado, compatible parcialmente, con errores*.
+La ficha del juego muestra su estado: *comprobando*, *listo para jugar*, *falta algo* (con qué y cómo resolverlo), *la carpeta ya no está*, *preparando*, *en marcha* o *deteniendo*. La compatibilidad (*no probado*, *no funciona*, *parcial*, *compatible*) viene de su perfil.
 
 ---
 
@@ -225,6 +226,23 @@ pokemon-to-linux          # o bien: python -m pokemon_to_linux
 ```
 
 Los registros se guardan en `~/.local/state/pokemon-to-linux/logs/`.
+
+### Jugar desde la interfaz
+
+1. **Añadir juego…** y elige la carpeta del juego (la que tiene `Game.exe`, `Game.ini` y `Data/`). El juego no se copia ni se modifica.
+2. La ficha del juego dice si está **listo para jugar** y, si no, qué falta y cómo instalarlo (Wine, OpenGL de 32 bits…). También muestra la compatibilidad según su perfil, dónde quedan las partidas, el historial y los problemas conocidos del juego.
+3. **Jugar**. La primera vez se crea el prefijo de Wine del juego (unos 25 s hasta el título de Pokémon Z). Si falta algo imprescindible, pregunta antes de lanzarlo.
+4. Al terminar (o con **Detener**), el lanzamiento queda en el historial con los problemas reconocidos en la salida del juego y su solución. **Ver último log** abre el log completo.
+
+**Quitar de la biblioteca** no borra nada del disco: ni la carpeta del juego ni su prefijo (con las partidas). Si lo vuelves a añadir, recuperas las partidas.
+
+Desde la terminal, la misma biblioteca:
+
+```bash
+pokemon-to-linux-cli library                    # lista los juegos
+pokemon-to-linux-cli library add "/ruta/al/juego"
+pokemon-to-linux-cli library remove pokemon-z   # no borra la carpeta ni el prefijo
+```
 
 ### Analizar un juego
 
@@ -271,6 +289,8 @@ pokemon-to-linux-cli run "/ruta/a/POKEMON Z V2.19"     # prepara el prefijo y la
 - **Partidas.** Con Wine, las partidas quedan **dentro del prefijo del juego**. No lo borres sin copiarlas antes.
 - **Diagnóstico.** Al terminar, `run` explica los problemas reconocidos en la salida del juego (falta OpenGL de 32 bits, wine32, una DLL, el audio…) y cómo resolverlos.
 
+Si la carpeta está en la biblioteca, `run` usa el mismo prefijo que la interfaz y guarda el lanzamiento en el historial.
+
 La primera vez se crea el prefijo del juego, lo que tarda unos segundos. Cada ejecución deja un log en `~/.local/state/pokemon-to-linux/logs/games/<id>/`, donde se conservan los 20 últimos. Ctrl+C detiene el juego de forma ordenada, cerrando también sus procesos secundarios.
 
 ### Pruebas y lint
@@ -310,7 +330,7 @@ Cada prueba registra el juego y su versión, el motor, la distribución, la arqu
 | 2 · Análisis ✅ | Escáner, lectura de `Game.ini`, detector XP/mkxp-z | Diagnóstico de Pokémon Z |
 | 3 · Wine ✅ | WineManager, PrefixManager, QProcess, logs | Juego de prueba lanzado desde Python |
 | 4 · Juego real ✅ | Perfil de Pokémon Z, dependencias, pruebas de juego | Pokémon Z se ejecuta por primera vez |
-| 5 · Biblioteca | SQLite, alta de juegos, biblioteca, detalles, diagnóstico | Lanzador completo de principio a fin |
+| 5 · Biblioteca ✅ | SQLite, alta de juegos, biblioteca, detalles, diagnóstico | Lanzador completo de principio a fin |
 | 6 · Estabilización | Cierres, fallos, documentación, versión 0.1 | MVP listo para pruebas de la comunidad |
 
 ### Primer hito

@@ -6,6 +6,7 @@
     pokemon-to-linux-cli run <carpeta> [--id ID] [--arch win32|win64] [--timeout SEG]
                              [--ignore-checks]
     pokemon-to-linux-cli profiles
+    pokemon-to-linux-cli library [list | add <carpeta> | remove <id>]
 
 Códigos de salida:
 - analyze: 0 = motor detectado, 1 = no detectado, 2 = error de uso o ruta.
@@ -13,6 +14,11 @@ Códigos de salida:
 - wine: 0 = Wine disponible (y, con --probe, ejecuta 32 y 64 bits), 1 = no.
 - run: el código de salida del juego; 1 si no terminó normalmente; 2 si no se pudo lanzar.
 - profiles: 0 = todos los perfiles son válidos, 1 = alguno se ha ignorado.
+- library: 0 = hecho, 1 = no se ha podido (p. ej. la carpeta ya está), 2 = error.
+
+Si la carpeta de ``run`` está en la biblioteca, se usa el identificador del
+juego en la biblioteca (y con él, su prefijo) y el lanzamiento se guarda en
+su historial, como al jugar desde la interfaz.
 """
 
 from __future__ import annotations
@@ -21,9 +27,10 @@ import argparse
 import json
 import os
 import signal
+import sqlite3
 import sys
 from collections.abc import Sequence
-from pathlib import PureWindowsPath
+from pathlib import Path, PureWindowsPath
 from typing import TextIO
 
 from PySide6.QtCore import QCoreApplication, QTimer
@@ -39,16 +46,21 @@ from pokemon_to_linux.application.check_requirements import check_requirements, 
 from pokemon_to_linux.application.diagnose_output import Finding, OutputDiagnoser
 from pokemon_to_linux.application.launch_game import (
     MISSING_32_BIT_HINT,
+    NO_WINE_MESSAGE,
     LaunchError,
     LaunchPlan,
     default_game_id,
     launch_game,
     prepare_launch,
 )
+from pokemon_to_linux.application.library import Library, LibraryError
 from pokemon_to_linux.application.profiles import match_profile
 from pokemon_to_linux.config import AppPaths
+from pokemon_to_linux.domain.game import Game
 from pokemon_to_linux.domain.profile import GameProfile
 from pokemon_to_linux.domain.requirements import CheckStatus, RequirementCheck
+from pokemon_to_linux.infrastructure.database.connection import DatabaseError, open_database
+from pokemon_to_linux.infrastructure.database.game_repository import GameRepository
 from pokemon_to_linux.infrastructure.filesystem.profile_store import ProfileSet, load_profiles
 from pokemon_to_linux.infrastructure.logging.logger import get_logger, setup_logging
 from pokemon_to_linux.infrastructure.system.host import HostSystem
@@ -70,12 +82,6 @@ EXIT_OK = EXIT_DETECTED = 0
 EXIT_NOT_DETECTED = 1
 EXIT_ERROR = 2
 EXIT_CANCELLED = 130  # convención de las shells para Ctrl+C
-
-NO_WINE_MESSAGE = (
-    "Wine no está instalado. Instálalo desde los repositorios de tu distribución "
-    "(Debian/Ubuntu: sudo apt install wine; Fedora: sudo dnf install wine; "
-    "Arch: sudo pacman -S wine). Pokémon to Linux no lo instala por ti."
-)
 
 
 def _format_size(size: int) -> str:
@@ -225,6 +231,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     sub.add_parser("profiles", help="lista los perfiles de compatibilidad")
+
+    library = sub.add_parser("library", help="juegos de la biblioteca (los de la interfaz)")
+    library_sub = library.add_subparsers(dest="library_command", metavar="acción")
+    library_sub.add_parser("list", help="lista los juegos (por defecto)")
+    library_add = library_sub.add_parser("add", help="añade la carpeta de un juego")
+    library_add.add_argument("path", help="carpeta del juego")
+    library_remove = library_sub.add_parser(
+        "remove", help="quita un juego (no borra su carpeta ni su prefijo)"
+    )
+    library_remove.add_argument("game_id", help="identificador del juego")
     return parser
 
 
@@ -456,6 +472,68 @@ def cmd_wine(args: argparse.Namespace) -> int:
     return EXIT_OK if all(r.ok for r in results) else EXIT_NOT_DETECTED
 
 
+def _open_library(paths: AppPaths) -> tuple[Library, sqlite3.Connection]:
+    conn = open_database(paths.database_path)
+    return Library(GameRepository(conn)), conn
+
+
+def cmd_library(args: argparse.Namespace) -> int:
+    paths = AppPaths.from_environment()
+    try:
+        library, conn = _open_library(paths)
+    except DatabaseError as exc:
+        return _error(exc)
+    try:
+        if args.library_command == "add":
+            try:
+                analysis = analyze_game(args.path)
+                game = library.add(analysis)
+            except GameScanError as exc:
+                return _error(exc)
+            except LibraryError as exc:
+                print(exc, file=sys.stderr)
+                return EXIT_NOT_DETECTED
+            print(f"Añadido: {game.name} ({game.id})")
+            return EXIT_OK
+        if args.library_command == "remove":
+            try:
+                library.remove(args.game_id)
+            except LibraryError as exc:
+                print(exc, file=sys.stderr)
+                return EXIT_NOT_DETECTED
+            print(f"Quitado: {args.game_id} (su carpeta y su prefijo no se han borrado)")
+            return EXIT_OK
+        games = library.games()
+        print(f"{APP_NAME} · biblioteca\n")
+        for game in games:
+            count = game.launch_count
+            played = "sin jugar" if not count else "1 vez" if count == 1 else f"{count} veces"
+            print(f"  {game.id:<24} {game.name} · {played}")
+            print(f"  {'':<24} {game.path}")
+        if not games:
+            print("  (vacía) Añade un juego con: pokemon-to-linux-cli library add <carpeta>")
+        print(f"\n  Base de datos: {paths.database_path}")
+        return EXIT_OK
+    finally:
+        conn.close()
+
+
+def _library_game(paths: AppPaths, folder: Path) -> tuple[Library, sqlite3.Connection, Game] | None:
+    """El juego de la biblioteca con esa carpeta, si lo hay (sin crear la base de datos)."""
+    if not paths.database_path.exists():
+        return None
+    try:
+        library, conn = _open_library(paths)
+    except DatabaseError as exc:
+        print(f"Aviso: no se puede abrir la biblioteca ({exc})", file=sys.stderr)
+        return None
+    game = next((g for g in library.games() if g.path == folder.resolve()), None)
+    if game is None:
+        conn.close()
+        return None
+    return library, conn, game
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     try:
         wine = _detect_wine()
@@ -483,6 +561,26 @@ def cmd_run(args: argparse.Namespace) -> int:
                 )
             print("Se lanza igualmente (--ignore-checks).\n")
 
+    in_library = _library_game(paths, analysis.path)
+    game_id = args.game_id
+    if in_library is not None and game_id is None:
+        game_id = in_library[2].id
+    try:
+        return _run_game(args, paths, wine, profiles, analysis, game_id, in_library)
+    finally:
+        if in_library is not None:
+            in_library[1].close()
+
+
+def _run_game(
+    args: argparse.Namespace,
+    paths: AppPaths,
+    wine: WineInstallation,
+    profiles: ProfileSet,
+    analysis: GameAnalysis,
+    game_id: str | None,
+    in_library: tuple[Library, sqlite3.Connection, Game] | None,
+) -> int:
     prefixes = PrefixManager(paths.prefixes_dir, wine)
     print("Preparando el juego (la primera vez se crea su prefijo y tarda unos segundos)…")
     try:
@@ -490,7 +588,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             args.path,
             wine=wine,
             prefixes=prefixes,
-            game_id=args.game_id,
+            game_id=game_id,
             arch=args.arch,
             profiles=profiles.profiles,
             analysis=analysis,
@@ -541,6 +639,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         print("\nProblemas detectados:", *format_findings(diagnoser.problems), sep="\n")
         for finding in diagnoser.problems:
             log.warning("%s: %s (%s)", plan.game_id, finding.issue.id, finding.line)
+    if in_library is not None and in_library[2].id == plan.game_id:
+        in_library[0].record_launch(plan.game_id, outcome, diagnoser.problems)
     if outcome.state is ProcessState.FINISHED and outcome.exit_code is not None:
         return outcome.exit_code if 0 <= outcome.exit_code <= 255 else EXIT_NOT_DETECTED
     return EXIT_NOT_DETECTED
@@ -562,6 +662,7 @@ COMMANDS = {
     "wine": cmd_wine,
     "run": cmd_run,
     "profiles": cmd_profiles,
+    "library": cmd_library,
 }
 
 

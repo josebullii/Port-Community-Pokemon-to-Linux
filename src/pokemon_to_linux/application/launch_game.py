@@ -40,6 +40,12 @@ MISSING_32_BIT_HINT = (
     "de 32 bits (multilib) de Wine."
 )
 
+NO_WINE_MESSAGE = (
+    "Wine no está instalado. Instálalo desde los repositorios de tu distribución "
+    "(Debian/Ubuntu: sudo apt install wine; Fedora: sudo dnf install wine; "
+    "Arch: sudo pacman -S wine). Pokémon to Linux no lo instala por ti."
+)
+
 GAME_WINEDEBUG = "fixme-all"
 """Al jugar se conservan los mensajes ``err`` de Wine: sirven para el diagnóstico."""
 
@@ -92,6 +98,8 @@ def prepare_launch(
     """
     if analysis is None:
         analysis = analyze_game(game_path)
+    elif Path(game_path).resolve() != analysis.path.resolve():
+        raise ValueError(f"el análisis es de {analysis.path}, no de {game_path}")
     detection = analysis.detection
     if not detection.detected:
         raise LaunchError(

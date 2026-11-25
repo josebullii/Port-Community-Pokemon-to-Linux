@@ -125,7 +125,7 @@ def test_rgss_line_matches_library_in_subfolder(make_game, make_pe, capsys):
 def fake_host(env=None, libraries=None):
     from pokemon_to_linux.infrastructure.system.host import HostSystem
 
-    host = HostSystem(env={"DISPLAY": ":0"} if env is None else env)
+    host = HostSystem(env={"DISPLAY": ":0"} if env is None else env, x11_socket_dir=None)
     host.__dict__["shared_libraries"] = {"libGL.so.1": {32, 64}} if libraries is None else libraries
     return host
 
@@ -463,3 +463,57 @@ def test_profiles_command(user_profile, capsys):
     (user_profile / "roto.toml").write_text("id = 1\n", encoding="utf-8")
     assert main(["profiles"]) == EXIT_NOT_DETECTED
     assert "Ignorados por errores" in capsys.readouterr().out
+
+
+# --- Biblioteca (sprint 5) -------------------------------------------------------
+
+
+def test_library_add_list_and_remove(make_game, capsys):
+    folder = make_game(exe="mkxp-z")
+
+    assert main(["library"]) == 0
+    assert "(vacía)" in capsys.readouterr().out
+
+    assert main(["library", "add", str(folder)]) == 0
+    assert "Añadido: Juego de prueba (juego-de-prueba)" in capsys.readouterr().out
+
+    assert main(["library", "add", str(folder)]) == EXIT_NOT_DETECTED
+    assert "ya está en la biblioteca" in capsys.readouterr().err
+
+    assert main(["library", "list"]) == 0
+    out = capsys.readouterr().out
+    assert "juego-de-prueba" in out
+    assert "sin jugar" in out
+
+    assert main(["library", "remove", "juego-de-prueba"]) == 0
+    assert "no se han borrado" in capsys.readouterr().out
+    assert folder.is_dir()
+    assert main(["library", "remove", "juego-de-prueba"]) == EXIT_NOT_DETECTED
+
+
+def test_library_add_errors(tmp_path, capsys):
+    assert main(["library", "add", str(tmp_path)]) == EXIT_NOT_DETECTED
+    assert "No se reconoce el motor" in capsys.readouterr().err
+    assert main(["library", "add", str(tmp_path / "no")]) == EXIT_ERROR
+
+
+def test_run_uses_the_library_id_and_records_the_launch(qapp, fake_wine, make_game, capsys):
+    """Una segunda copia del juego es «juego-de-prueba-2»: run debe usar su prefijo."""
+    main(["library", "add", str(make_game(exe="runnable"))])
+    second = make_game(exe="runnable")
+    main(["library", "add", str(second)])
+    capsys.readouterr()
+
+    main(["run", str(second)])
+    out = capsys.readouterr().out
+
+    assert "Juego:       juego-de-prueba-2" in out
+    main(["library", "list"])
+    out = capsys.readouterr().out
+    assert "· 1 vez" in out
+    assert out.count("sin jugar") == 1
+
+
+def test_run_outside_the_library_does_not_create_it(qapp, fake_wine, make_game, xdg_tmp):
+    main(["run", str(make_game(exe="runnable"))])
+    assert not list(xdg_tmp.rglob("library.sqlite3"))
