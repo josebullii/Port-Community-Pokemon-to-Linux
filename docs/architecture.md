@@ -40,10 +40,19 @@ Pokémon to Linux es un lanzador y gestor de compatibilidad. No reescribe los ju
 | `infrastructure/wine/prefix_manager.py` | `PrefixManager`: un prefijo por juego. Lo crea, reutiliza, prueba y borra | 3 ✅ |
 | `infrastructure/wine/process_manager.py` | `GameProcess` y `ProcessManager`: QProcess, salida línea a línea, log por lanzamiento y cierre ordenado | 3 ✅ |
 | `infrastructure/wine/test_program.py` | Genera un `.exe` mínimo real (32 o 64 bits) que termina con un código dado | 3 ✅ |
-| `application/launch_game.py` | `prepare_launch`, `launch_game` y `stop_game` | 3 ✅ |
-| `domain/` | Entidades `Game`, `Engine`, `Profile`, estado de compatibilidad | 4 |
+| `application/launch_game.py` | `prepare_launch` (aplica el perfil), `launch_game` y `stop_game` | 3-4 ✅ |
+| `domain/compatibility.py` | `CompatibilityStatus`: no probado, no funciona, parcial, compatible | 4 ✅ |
+| `domain/profile.py` | `GameProfile` y su validación (`parse_profile`), `select_profile` | 4 ✅ |
+| `domain/requirements.py` | `RequirementCheck` y `CheckStatus` (ok, aviso, error, desconocido) | 4 ✅ |
+| `profiles/*.toml` | Perfiles integrados: [Pokémon Z](../src/pokemon_to_linux/profiles/pokemon-z.toml) | 4 ✅ |
+| `infrastructure/filesystem/profile_store.py` | Carga los perfiles integrados y los del usuario (`~/.config/…/profiles`) | 4 ✅ |
+| `infrastructure/system/host.py` | `HostSystem`: bibliotecas (`ldconfig -p`), sesión gráfica y sistema de ficheros de cada carpeta | 4 ✅ |
+| `application/profiles.py` | `match_profile` y `resolve_folder` (carpetas de partidas dentro del prefijo) | 4 ✅ |
+| `application/check_requirements.py` | Sesión gráfica, OpenGL con los bits del juego y sistema de ficheros lento | 4 ✅ |
+| `application/diagnose_output.py` | `OutputDiagnoser`: problemas conocidos en la salida del juego | 4 ✅ |
+| `cli.py` | Comandos `check` y `profiles`; `run` comprueba requisitos y diagnostica | 4 ✅ |
 | `infrastructure/database/` | Conexión SQLite y repositorios | 5 |
-| `application/` (resto) | Casos de uso para añadir y configurar juegos | 4-5 |
+| `application/` (resto) | Casos de uso para añadir y configurar juegos | 5 |
 
 ## Detección de motor (sprint 2)
 
@@ -106,6 +115,7 @@ Las dos últimas generan advertencia.
 | `prefixes_dir` | `…/share/pokemon-to-linux/prefixes/` | Un `WINEPREFIX` por juego |
 | `database_path` | `…/share/pokemon-to-linux/library.sqlite3` | Biblioteca, perfiles, historial |
 | `config_dir` | `~/.config/pokemon-to-linux/` | Preferencias |
+| `profiles_dir` | `~/.config/pokemon-to-linux/profiles/` | Perfiles de compatibilidad del usuario |
 | `cache_dir` | `~/.cache/pokemon-to-linux/` | Caché que se puede regenerar |
 | `state_dir` / `log_dir` | `~/.local/state/pokemon-to-linux/logs/` | Registros |
 
@@ -115,7 +125,7 @@ Se respetan `XDG_DATA_HOME`, `XDG_CONFIG_HOME`, `XDG_CACHE_HOME` y `XDG_STATE_HO
 
 | Vía | Plataforma | Estado |
 |---|---|---|
-| Wine + `Game.exe` original | Linux x86_64 de escritorio | MVP (sprints 3-4) |
+| Wine + `Game.exe` original | Linux x86_64 de escritorio | MVP. Pokémon Z funciona desde el sprint 4 |
 | mkxp-z nativo | Linux ARM64 (R36S) y x86_64 | Después del MVP |
 
 Pokémon Z v2.19 ya incluye mkxp-z como `Game.exe`, junto con `mkxp.json` y `preload.rb`. Ver [compatibility.md](compatibility.md).
@@ -155,6 +165,32 @@ Comprobado con Wine real (prueba `test_stop_game_closes_game_and_secondary_proce
 ### Programa de prueba
 
 `test_program.py` genera byte a byte un ejecutable PE real de 32 o 64 bits que llama a `kernel32!Sleep(ms)` y después a `kernel32!ExitProcess(código)`. Con `sleep_ms` grande sirve para probar cómo se detiene un programa en marcha. Así se puede comprobar Wine y probar el lanzador de extremo a extremo sin compiladores, sin binarios en el repositorio y sin juegos con copyright.
+
+## Perfiles, requisitos y diagnóstico (sprint 4)
+
+```
+run <carpeta>
+  ├─ load_profiles              → integrados + ~/.config/…/profiles (los rotos se avisan)
+  ├─ analyze_game
+  ├─ check_requirements         → sesión gráfica, OpenGL de N bits, sistema de ficheros
+  │                               (un error bloquea, salvo --ignore-checks)
+  ├─ prepare_launch(profiles=…) → match_profile: arquitectura, entorno, carpetas de partidas
+  └─ launch_game + OutputDiagnoser
+                                → al terminar: mensajes esperados y problemas, con solución
+```
+
+Decisiones, comprobadas con Pokémon Z en Ubuntu 24.04 (WSL2) y Wine 9.0:
+
+| Decisión | Motivo |
+|---|---|
+| **Comprobar OpenGL con los bits del juego antes de lanzar** | Fue el primer fallo real: Pokémon Z es de 32 bits e importa `opengl32.dll`, que Wine implementa con la `libGL.so.1` de 32 bits del sistema. `wine32:i386` no la instala con `--no-install-recommends`, y mkxp-z falla con *No matching GL pixel format available*. |
+| **`ldconfig -p`, no rutas fijas** | Cada distribución pone las bibliotecas de 32 bits en un sitio (`/usr/lib/i386-linux-gnu`, `/usr/lib32`, `/usr/lib`). `ldconfig` sabe cuáles son de 32 bits. Se busca también en `/usr/sbin`, que en Debian no está en el `PATH` de los usuarios. Con libglvnd hace falta además un `libGLX_<driver>.so.0` de los mismos bits. |
+| **Lo que no se puede comprobar no bloquea** | Sin `ldconfig` (NixOS, musl…) el estado es "desconocido" y el juego se lanza. |
+| **Aviso, no error, por sistema de ficheros lento** | Desde `/mnt/c` de WSL (9P), Pokémon Z tarda unos 2,5 minutos en mostrar el título; desde ext4, unos 20 s. Funciona, pero parece colgado. |
+| **Perfiles como datos validados** | Una lista cerrada de variables de entorno (nada de `LD_PRELOAD`, `PATH` ni `WINE*`), rutas de partidas que no salen de su carpeta y patrones de salida literales (nada de expresiones regulares). Formato: [profiles.md](profiles.md). |
+| **Las partidas están dentro del prefijo** | Pokémon Essentials guarda en `%USERPROFILE%\Saved Games\<juego>`, que con Wine es `<prefijo>/drive_c/users/<usuario>/Saved Games/<juego>`. El perfil lo declara y `run` lo muestra: borrar el prefijo borraría las partidas. |
+| **`WINEDEBUG=fixme-all` al jugar** | Con `-all` se perdían los `err` de Wine, que dicen la causa exacta (p. ej. `Failed to load libGL`). Los `fixme` siguen ocultos porque son ruido. |
+| **Problemas del perfil antes que los generales** | Así un perfil puede declarar como inofensivo (`harmless`) un mensaje que en general sería un error: en Pokémon Z, las DLL que le faltan a `fluidsynth.dll` (no tiene MIDI). |
 
 ## Principios
 

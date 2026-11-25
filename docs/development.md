@@ -5,7 +5,7 @@
 - Python **3.12 o superior**
 - Git
 - Bibliotecas del sistema que necesita Qt 6 (ver abajo)
-- Wine, solo a partir del sprint 3
+- Wine y OpenGL de 32 bits, a partir del sprint 3
 
 ### Paquetes del sistema en Linux
 
@@ -47,13 +47,15 @@ ldd .venv/lib/python3*/site-packages/PySide6/Qt/plugins/platforms/libqxcb.so | g
 
 ### Wine (desde el sprint 3)
 
-Pokémon Z y la mayoría de fangames de RPG Maker XP son **de 32 bits**, así que Wine necesita soporte de 32 bits.
+Pokémon Z y la mayoría de fangames de RPG Maker XP son **de 32 bits**, así que Wine necesita soporte de 32 bits. Y como Pokémon Z (mkxp-z) dibuja con OpenGL, hace falta también **OpenGL de 32 bits**.
 
 | Distribución | Comando |
 |---|---|
-| Debian / Ubuntu | `sudo dpkg --add-architecture i386 && sudo apt update && sudo apt install wine wine64 wine32:i386` |
-| Fedora | `sudo dnf install wine` (trae el soporte de 32 bits) |
-| Arch / Manjaro | activar `[multilib]` en `/etc/pacman.conf` y `sudo pacman -S wine` |
+| Debian / Ubuntu | `sudo dpkg --add-architecture i386 && sudo apt update && sudo apt install wine wine64 wine32:i386 libgl1:i386 libgl1-mesa-dri:i386` |
+| Fedora (sin probar) | `sudo dnf install wine mesa-libGL.i686 mesa-dri-drivers.i686` |
+| Arch / Manjaro (sin probar) | activar `[multilib]` en `/etc/pacman.conf` y `sudo pacman -S wine lib32-mesa` |
+
+Con los drivers propietarios de NVIDIA, instala también su parte de 32 bits.
 
 Comprueba que funciona:
 
@@ -64,6 +66,20 @@ pokemon-to-linux-cli wine --probe
 ```
 
 En Ubuntu, el paquete `wine64` solo no basta. No añade `wine` al PATH (se queda en `/usr/lib/wine/wine64`; la aplicación lo encuentra igualmente) y **no ejecuta programas de 32 bits**: falta `wine32:i386`.
+
+`wine32:i386` instalado con `--no-install-recommends` no trae OpenGL de 32 bits, y Pokémon Z falla con *No matching GL pixel format available*. Para comprobar todo lo que necesita un juego:
+
+```bash
+pokemon-to-linux-cli check "/ruta/a/POKEMON Z V2.19"
+#   [ok]     Sesión gráfica: X11 en :0
+#   [ok]     OpenGL de 32 bits: libGL.so.1 (mesa)
+#   [ok]     Carpeta del juego: ext4
+#   Listo para jugar: sí
+```
+
+#### WSL
+
+Pokémon Z funciona en WSL2 con WSLg (Ubuntu 24.04), con OpenGL por software (llvmpipe). Copia el juego al sistema de ficheros de Linux (p. ej. `~/Juegos`): desde `/mnt/c` tarda unos 2,5 minutos en mostrar el título.
 
 ## Puesta en marcha
 
@@ -110,7 +126,10 @@ Son opcionales y en el CI se omiten. Se activan indicando la ruta de tu copia:
 
 ```bash
 PTL_POKEMON_Z_PATH="/ruta/a/POKEMON Z V2.19" pytest -m realgame
+PTL_POKEMON_Z_PATH="/ruta/a/POKEMON Z V2.19" xvfb-run -a pytest -m realgame   # sin pantalla
 ```
+
+`test_pokemon_z_starts_with_wine` lanza el juego con su perfil en un **prefijo temporal** (nunca el tuyo, que tiene tus partidas), espera a que cree la ventana OpenGL, comprueba que sigue en marcha sin problemas en la salida y lo cierra. Tarda unos 2 minutos.
 
 ## Analizar un juego desde la terminal
 
@@ -126,9 +145,15 @@ Códigos de salida: `0` motor detectado, `1` no detectado, `2` ruta no válida.
 ```bash
 pokemon-to-linux-cli wine                    # qué Wine hay instalado
 pokemon-to-linux-cli wine --probe            # ¿ejecuta 32 y 64 bits?
+pokemon-to-linux-cli check "/ruta/al/juego"  # ¿está todo listo para jugar? (--json)
 pokemon-to-linux-cli run "/ruta/al/juego"    # prepara el prefijo y lanza el juego
 pokemon-to-linux-cli run "/ruta/al/juego" --arch win32 --id mi-juego --timeout 60
+pokemon-to-linux-cli profiles                # perfiles de compatibilidad cargados
 ```
+
+`check` devuelve `0` si el juego está listo para jugar y `1` si falta algo.
+
+`run` comprueba primero los requisitos del sistema. Si falta uno imprescindible (p. ej. OpenGL de 32 bits), explica cómo instalarlo y no lanza el juego; `--ignore-checks` lo lanza igualmente. Después aplica el perfil del juego, muestra dónde están las partidas y, al terminar, los problemas reconocidos en la salida con su solución.
 
 `run` devuelve el código de salida del juego. Si no terminó normalmente devuelve `1`, y si no se pudo lanzar, `2`.
 
@@ -136,7 +161,8 @@ Ctrl+C:
 - **Con el juego en marcha**, lo detiene de forma ordenada (`wineserver -k`).
 - **Mientras se prepara el prefijo**, cancela, borra el prefijo a medias y devuelve `130`.
 
-- **Prefijos**: `~/.local/share/pokemon-to-linux/prefixes/<id>`.
+- **Prefijos**: `~/.local/share/pokemon-to-linux/prefixes/<id>`. Las partidas suelen estar dentro (`drive_c/users/<usuario>/…`): no borres un prefijo sin copiarlas antes.
+- **Perfiles del usuario**: `~/.config/pokemon-to-linux/profiles/*.toml` ([formato](profiles.md)).
 - **Log de cada lanzamiento**: `~/.local/state/pokemon-to-linux/logs/games/<id>/<fecha>.log`. Se conservan los últimos 20 por juego.
 
 ## Integración continua
@@ -153,9 +179,10 @@ Ctrl+C:
 
 **Job `wine`** (Ubuntu 24.04, Python 3.12):
 
-1. Instala Wine 9.0 con `wine32:i386`.
+1. Instala Wine 9.0 con `wine32:i386` y OpenGL de 32 bits (`libgl1:i386`, `libgl1-mesa-dri:i386`).
 2. Comprueba con `wine --probe` que ejecuta 32 y 64 bits.
-3. Ejecuta `pytest -m wine`, que incluye lanzar el juego de prueba de extremo a extremo.
+3. Comprueba que se detecta OpenGL de 32 y 64 bits y que los perfiles integrados son válidos.
+4. Ejecuta `pytest -m wine`, que incluye lanzar el juego de prueba de extremo a extremo.
 
 ## Convenciones
 
