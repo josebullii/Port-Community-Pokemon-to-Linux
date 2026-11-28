@@ -5,7 +5,7 @@
 
 Lanzador y gestor de compatibilidad para ejecutar en Linux **fangames de Pokémon creados para Windows**, empezando por **Pokémon Z** (RPG Maker XP / Pokémon Essentials). El objetivo final es que también funcionen en consolas portátiles Linux como la **Anbernic R36S**.
 
-> **Estado:** sprint 5 completado: **se puede jugar a Pokémon Z sin abrir una terminal**. En la ventana de la aplicación se añade la carpeta del juego, se ve si está listo para jugar (y qué falta si no), se pulsa «Jugar» y, al terminar, queda en el historial con los problemas reconocidos. La aplicación reconoce el juego por su perfil de compatibilidad, comprueba Wine y OpenGL de 32 bits, prepara un prefijo propio para el juego y lo lanza. Se ha probado en Ubuntu 24.04 sobre WSL2, con OpenGL por software (título, menús, exploración, guardar y cargar partida); faltan el combate, el audio y un Linux nativo con GPU. El sprint 6 se centra en estabilizar y publicar la versión 0.1.
+> **Estado:** sprint 5 completado: **se puede jugar a Pokémon Z sin abrir una terminal**. En la ventana de la aplicación se añade la carpeta del juego, se ve si está listo para jugar (y qué falta si no), se pulsa «Jugar» y, al terminar, queda en el historial con los problemas reconocidos. La aplicación reconoce el juego por su perfil de compatibilidad, comprueba Wine y OpenGL de 32 bits, prepara un prefijo propio para el juego y lo lanza. Se ha probado en Ubuntu 24.04 sobre WSL2, con OpenGL por software (título, menús, exploración, guardar y cargar partida); faltan el combate, el audio y un Linux nativo con GPU. La primera versión de prueba, **[0.1.0-alpha.1](https://github.com/josebullii/Port-Community-Pokemon-to-Linux/releases)**, se puede [descargar e instalar](#instalación) como un solo ejecutable. El sprint 6 se centra en estabilizar y publicar la versión 0.1.
 
 ---
 
@@ -23,6 +23,75 @@ Pokémon to Linux **no reescribe** los juegos ni los convierte en ports nativos 
 - No descarga ni redistribuye juegos, ROMs, recursos, DLL ni runtimes propietarios. **El usuario aporta su propia copia del juego.**
 - No ejecuta scripts arbitrarios procedentes de perfiles de la comunidad.
 - No instala Wine ni otras dependencias del sistema sin avisar.
+
+---
+
+## Instalación
+
+Pokémon to Linux se distribuye como **un solo ejecutable para Linux x86_64** (no hace falta Python). Funciona en Ubuntu 22.04 o más nuevo, Debian 12+, Fedora 36+, Arch y, en general, con glibc 2.35 o posterior. Se ha probado con Pokémon Z en **Ubuntu 24.04**.
+
+### 1. Instala Wine y OpenGL de 32 bits
+
+Pokémon Z es un programa de Windows de 32 bits que dibuja con OpenGL, así que necesita Wine con soporte de 32 bits. En Ubuntu / Debian:
+
+```bash
+sudo dpkg --add-architecture i386 && sudo apt update
+sudo apt install wine wine64 wine32:i386 libgl1:i386 libgl1-mesa-dri:i386
+```
+
+En Fedora (sin probar): `sudo dnf install wine mesa-libGL.i686 mesa-dri-drivers.i686`. En Arch (sin probar): activa el repositorio `multilib` y `sudo pacman -S wine lib32-mesa`. Con los drivers propietarios de NVIDIA, instala también su parte de 32 bits. Si te falta algo, la propia aplicación te lo dirá.
+
+### 2. Descarga e instala la aplicación
+
+Descarga `pokemon-to-linux-<versión>-x86_64.tar.gz` de la [última release](https://github.com/josebullii/Port-Community-Pokemon-to-Linux/releases) y, en la carpeta donde lo hayas descargado:
+
+```bash
+tar xzf pokemon-to-linux-0.1.0a1-x86_64.tar.gz
+cd pokemon-to-linux-0.1.0a1-x86_64
+./install.sh
+```
+
+`install.sh` no necesita `sudo`: copia el ejecutable a `~/.local/bin/pokemon-to-linux` y añade **Pokémon to Linux** al menú de aplicaciones. Si prefieres no instalar nada, ejecútalo directamente con `./pokemon-to-linux-0.1.0a1-x86_64`. La primera vez tarda unos segundos en abrirse.
+
+Para comprobar la descarga: `sha256sum -c SHA256SUMS --ignore-missing`. Para desinstalar: `./install.sh --uninstall` (no borra la biblioteca, los prefijos de Wine ni las partidas).
+
+### 3. Consigue el juego
+
+El proyecto no incluye ningún juego. Copia **tu** carpeta de Pokémon Z (la que tiene `Game.exe`, `Game.ini` y `Data/`) a una carpeta de Linux, por ejemplo `~/Juegos/POKEMON Z V2.19`. Evita carpetas de Windows, de red o de un USB en NTFS: desde ahí el juego carga mucho más lento.
+
+---
+
+## Uso de la aplicación de escritorio
+
+Abre **Pokémon to Linux** desde el menú de aplicaciones (o con `pokemon-to-linux` en una terminal). La ventana tiene tres páginas a la izquierda: **Biblioteca**, **Diagnóstico** y **Acerca de**.
+
+![Ficha de Pokémon Z en la biblioteca, lista para jugar](docs/img/biblioteca.png)
+
+1. **Añade el juego.** En *Biblioteca*, pulsa **Añadir juego…** y elige la carpeta del juego. La aplicación la analiza, reconoce el motor (RPG Maker XP / mkxp-z) y lo añade a la lista. El juego no se copia ni se modifica.
+2. **Mira si está listo.** La ficha del juego muestra:
+   - **✔ Listo para jugar**, o **qué falta** y cómo instalarlo (Wine, OpenGL de 32 bits, sesión gráfica…).
+   - La **compatibilidad** según su perfil (*no probado*, *no funciona*, *parcial*, *compatible*).
+   - Dónde se guardan las **partidas**, el **historial** (veces jugado, tiempo, última vez) y los **problemas conocidos** del juego con su solución.
+3. **Pulsa Jugar.** La primera vez se crea el prefijo de Wine del juego y se comprueba que Wine ejecuta programas de 32 bits: tarda unos 25 s hasta la pantalla de título. Las siguientes veces arranca enseguida. Si falta algo imprescindible, te avisa antes de lanzarlo.
+4. **Juega.** Mientras el juego está abierto, la ficha dice *En marcha*. Para cerrarlo, sal desde el propio juego o pulsa **Detener**, que lo cierra junto con todos sus procesos de Wine.
+5. **Revisa el resultado.** Al terminar, el lanzamiento queda en el historial. Si en la salida del juego se ha reconocido algún problema (falta OpenGL de 32 bits, una DLL, el audio…), aparece en la ficha con su solución. **Ver último log** abre el registro completo.
+
+Otros botones de la ficha:
+
+| Botón | Qué hace |
+|---|---|
+| **Volver a comprobar** | Repite la comprobación de requisitos (p. ej. después de instalar algo que faltaba). |
+| **Abrir carpeta de partidas** | Abre la carpeta de las partidas, dentro del prefijo de Wine del juego. **Cópiala antes de borrar el prefijo.** |
+| **Abrir carpeta del juego** | Abre la carpeta del juego en el gestor de archivos. |
+| **Quitar de la biblioteca** | Quita el juego de la lista. **No borra nada del disco**: ni la carpeta del juego ni su prefijo con las partidas. Si lo vuelves a añadir, recuperas las partidas. |
+
+La página **Diagnóstico** muestra la versión, las rutas de datos y registros, la versión de Wine y si hay OpenGL de 32 y 64 bits. Es lo que conviene adjuntar al abrir una [incidencia](https://github.com/josebullii/Port-Community-Pokemon-to-Linux/issues).
+
+**Consejos para Pokémon Z:** si va demasiado rápido, pon *VSync* en «No» en las opciones del juego; si se cierra al salir un Pokémon en combate, desactiva los sprites animados; juega en ventana si la pantalla completa se queda en negro.
+
+**Dónde quedan los datos:** biblioteca y prefijos (con las partidas) en `~/.local/share/pokemon-to-linux/`; registros en `~/.local/state/pokemon-to-linux/logs/`.
+
+La línea de comandos va en el mismo ejecutable, con `cli` delante: `pokemon-to-linux cli check "/ruta/al/juego"`, `pokemon-to-linux cli library`… (ver [Desarrollo](#desarrollo)).
 
 ---
 
@@ -84,14 +153,14 @@ Arquitectura modular por capas. La interfaz nunca invoca Wine directamente: pide
 | Persistencia | SQLite |
 | Pruebas | pytest |
 | Lint y formato | Ruff |
-| Distribución | Por decidir después del MVP (posible Flatpak; paquete para PortMaster / R36S) |
+| Distribución | Ejecutable único con PyInstaller en las [releases](https://github.com/josebullii/Port-Community-Pokemon-to-Linux/releases); más adelante, posible Flatpak y paquete para PortMaster / R36S |
 
 ### Estructura del repositorio
 
 ```
 Port-Community-Pokemon-to-Linux/
 ├── pyproject.toml, README.md, LICENSE, .gitignore
-├── .github/workflows/ci.yml
+├── .github/workflows/  # ci.yml (cada push), release.yml (al subir una etiqueta v*)
 ├── src/pokemon_to_linux/
 │   ├── main.py, config.py
 │   ├── ui/              # main_window, library_page, game_details, diagnostics_page, tasks
@@ -107,6 +176,7 @@ Port-Community-Pokemon-to-Linux/
 │   ├── profiles/        # perfiles de compatibilidad integrados (*.toml)
 │   └── resources/       # icons, styles
 ├── tests/               # unit, integration
+├── packaging/          # pyinstaller/ (ejecutable), linux/ (install.sh y LEEME de la release)
 ├── tools/manual-test/   # drive.sh: pruebas manuales en una pantalla virtual
 └── docs/                # architecture, compatibility, development, profiles
 ```
@@ -229,12 +299,7 @@ Los registros se guardan en `~/.local/state/pokemon-to-linux/logs/`.
 
 ### Jugar desde la interfaz
 
-1. **Añadir juego…** y elige la carpeta del juego (la que tiene `Game.exe`, `Game.ini` y `Data/`). El juego no se copia ni se modifica.
-2. La ficha del juego dice si está **listo para jugar** y, si no, qué falta y cómo instalarlo (Wine, OpenGL de 32 bits…). También muestra la compatibilidad según su perfil, dónde quedan las partidas, el historial y los problemas conocidos del juego.
-3. **Jugar**. La primera vez se crea el prefijo de Wine del juego (unos 25 s hasta el título de Pokémon Z). Si falta algo imprescindible, pregunta antes de lanzarlo.
-4. Al terminar (o con **Detener**), el lanzamiento queda en el historial con los problemas reconocidos en la salida del juego y su solución. **Ver último log** abre el log completo.
-
-**Quitar de la biblioteca** no borra nada del disco: ni la carpeta del juego ni su prefijo (con las partidas). Si lo vuelves a añadir, recuperas las partidas.
+Igual que con el ejecutable de la release: ver [Uso de la aplicación de escritorio](#uso-de-la-aplicación-de-escritorio).
 
 Desde la terminal, la misma biblioteca:
 
@@ -293,6 +358,15 @@ Si la carpeta está en la biblioteca, `run` usa el mismo prefijo que la interfaz
 
 La primera vez se crea el prefijo del juego, lo que tarda unos segundos. Cada ejecución deja un log en `~/.local/state/pokemon-to-linux/logs/games/<id>/`, donde se conservan los 20 últimos. Ctrl+C detiene el juego de forma ordenada, cerrando también sus procesos secundarios.
 
+### Construir el ejecutable
+
+```bash
+pip install . "pyinstaller>=6.10"
+pyinstaller --noconfirm packaging/pyinstaller/pokemon-to-linux.spec   # → dist/pokemon-to-linux
+```
+
+Al subir una etiqueta `vX.Y.Z` (o `vX.Y.Z-alpha.N`) que coincida con la versión de `pyproject.toml`, el workflow [`release.yml`](.github/workflows/release.yml) lo construye en Ubuntu 22.04, comprueba que arranca y lo publica en la release con `install.sh` y `SHA256SUMS`. Detalles en [docs/development.md](docs/development.md#publicar-una-versión).
+
 ### Pruebas y lint
 
 ```bash
@@ -331,7 +405,7 @@ Cada prueba registra el juego y su versión, el motor, la distribución, la arqu
 | 3 · Wine ✅ | WineManager, PrefixManager, QProcess, logs | Juego de prueba lanzado desde Python |
 | 4 · Juego real ✅ | Perfil de Pokémon Z, dependencias, pruebas de juego | Pokémon Z se ejecuta por primera vez |
 | 5 · Biblioteca ✅ | SQLite, alta de juegos, biblioteca, detalles, diagnóstico | Lanzador completo de principio a fin |
-| 6 · Estabilización | Cierres, fallos, documentación, versión 0.1 | MVP listo para pruebas de la comunidad |
+| 6 · Estabilización | Cierres, fallos, documentación, versión 0.1 (0.1.0-alpha.1 ya publicada para pruebas) | MVP listo para pruebas de la comunidad |
 
 ### Primer hito
 

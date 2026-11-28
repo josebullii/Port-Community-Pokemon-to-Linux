@@ -141,6 +141,20 @@ Mismo entorno, con la interfaz en un Xvfb (`tools/manual-test/drive.sh gui`) y s
 
 Las funciones del juego (combate, audio) siguen sin comprobar: el estado no cambia.
 
+### Ejecutable de la release (0.1.0a1)
+
+2026-11-28, mismo entorno, con el ejecutable de PyInstaller (`dist/pokemon-to-linux`) en vez del paquete instalado con pip, y datos nuevos (biblioteca vacía, sin prefijo):
+
+| Paso | Resultado | Notas |
+|---|---|---|
+| `pytest`, `pytest -m "wine or realgame"` | ✅ | 420 pruebas + 13 con Wine y el juego real |
+| Arranque de la interfaz | ✅ | Biblioteca vacía con las instrucciones para añadir un juego |
+| «Añadir juego…» → ficha | ✅ | «Listo para jugar» |
+| «Jugar» sin prefijo | ✅ | Crea el prefijo; ventana del juego a los ~23 s, título y menú principal |
+| «Detener» | ✅ | Sin procesos de Wine colgados; historial: 1 vez, «detenido desde la aplicación» |
+| Diagnóstico | ✅ | Versión 0.1.0a1, Wine 9.0, OpenGL de 32 y 64 bits |
+| `install.sh` / `--uninstall` | ✅ | Ejecutable en `~/.local/bin` y entrada del menú; desinstalar no toca los datos |
+
 ### Contenido de la carpeta
 
 Datos obtenidos al analizar los archivos del juego:
