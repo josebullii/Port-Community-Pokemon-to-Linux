@@ -1,0 +1,45 @@
+Pokémon to Linux @VERSION@ · Linux x86_64
+==========================================
+
+Lanzador para jugar en Linux a fangames de Pokémon hechos para Windows
+(RPG Maker XP), empezando por Pokémon Z. Usa Wine: el juego no se modifica.
+No incluye ningún juego: necesitas tu propia copia.
+
+Construido con PyInstaller en Ubuntu 22.04: funciona con glibc 2.35 o más
+nueva (Ubuntu 22.04+, Debian 12+, Fedora 36+, Arch...). Probado con Pokémon Z
+en Ubuntu 24.04 y Wine 9.0.
+
+1. Paquetes del sistema (Ubuntu / Debian)
+
+   sudo dpkg --add-architecture i386 && sudo apt update
+   sudo apt install wine wine64 wine32:i386 libgl1:i386 libgl1-mesa-dri:i386
+
+   Fedora y Arch: ver el README del proyecto.
+
+2. Instalar (sin sudo; lo añade al menú de aplicaciones)
+
+   tar xzf pokemon-to-linux-@VERSION@-x86_64.tar.gz
+   cd pokemon-to-linux-@VERSION@-x86_64
+   ./install.sh
+
+   O sin instalar nada:
+   ./pokemon-to-linux-@VERSION@-x86_64
+
+   La primera vez tarda unos segundos en abrirse (se descomprime en /tmp).
+   Para desinstalar: ./install.sh --uninstall (tus partidas no se borran).
+
+3. Jugar
+
+   En la ventana: «Añadir juego…» → elige la carpeta del juego (la que tiene
+   Game.exe, Game.ini y Data/) → «Jugar». Copia el juego a una carpeta de
+   Linux (no a una de red ni de Windows): desde ahí carga mucho más rápido.
+
+La CLI va en el mismo ejecutable, con «cli» delante:
+   pokemon-to-linux cli check "/ruta/a/POKEMON Z V2.19"
+   pokemon-to-linux cli library
+
+Datos: ~/.local/share/pokemon-to-linux (biblioteca y prefijos de Wine, con las
+partidas dentro). Registros: ~/.local/state/pokemon-to-linux/logs.
+
+Más información, problemas y avisos:
+https://github.com/josebullii/Port-Community-Pokemon-to-Linux
