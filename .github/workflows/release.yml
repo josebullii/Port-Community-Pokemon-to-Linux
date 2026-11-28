@@ -79,14 +79,15 @@ jobs:
         id: pack
         run: |
           name="pokemon-to-linux-${{ steps.version.outputs.version }}-x86_64"
-          mkdir -p "out/$name"
-          cp dist/pokemon-to-linux "out/$name/$name"
-          cp packaging/linux/install.sh LICENSE "out/$name/"
-          sed "s/@VERSION@/${{ steps.version.outputs.version }}/g" packaging/linux/LEEME.txt > "out/$name/LEEME.txt"
-          chmod +x "out/$name/$name" "out/$name/install.sh"
+          # stage/: contenido del .tar.gz · out/: lo que se sube a la release
+          mkdir -p "stage/$name" out
+          cp dist/pokemon-to-linux "stage/$name/$name"
+          cp packaging/linux/install.sh LICENSE "stage/$name/"
+          sed "s/@VERSION@/${{ steps.version.outputs.version }}/g" packaging/linux/LEEME.txt > "stage/$name/LEEME.txt"
+          chmod +x "stage/$name/$name" "stage/$name/install.sh"
+          tar czf "out/$name.tar.gz" -C stage "$name"
+          cp "stage/$name/$name" out/
           cd out
-          tar czf "$name.tar.gz" "$name"
-          cp "$name/$name" .
           sha256sum "$name.tar.gz" "$name" > SHA256SUMS
           cat SHA256SUMS
           echo "name=$name" >> "$GITHUB_OUTPUT"
