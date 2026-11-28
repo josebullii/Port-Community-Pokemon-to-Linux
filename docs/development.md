@@ -218,6 +218,22 @@ Ctrl+C:
 3. Comprueba que se detecta OpenGL de 32 y 64 bits y que los perfiles integrados son válidos.
 4. Ejecuta `pytest -m wine`, que incluye lanzar el juego de prueba de extremo a extremo.
 
+**Workflow `release`** (`.github/workflows/release.yml`, al subir una etiqueta `v*`):
+
+1. Comprueba que la etiqueta coincide con la versión de `pyproject.toml` (`v0.1.0-alpha.1` ↔ `0.1.0a1`).
+2. Construye el ejecutable con PyInstaller en **Ubuntu 22.04**, para que funcione con glibc 2.35 o más nueva.
+3. Comprueba que arranca: `cli --version`, `cli profiles` y la interfaz 10 s en Xvfb.
+4. Publica en la release de la etiqueta `pokemon-to-linux-<versión>-x86_64.tar.gz` (ejecutable, `install.sh`, `LEEME.txt`, `LICENSE`), el ejecutable suelto y `SHA256SUMS`. Si la etiqueta lleva guion (`-alpha.1`, `-rc.1`…), la marca como *pre-release*.
+
+## Publicar una versión
+
+1. Sube la versión en `pyproject.toml` (formato PEP 440: `0.1.0a1`, `0.1.0rc1`, `0.1.0`) y fusiona en `release`.
+2. Prueba el ejecutable a mano: `pyinstaller --noconfirm packaging/pyinstaller/pokemon-to-linux.spec` y recorre añadir juego → Jugar → Detener (con `tools/manual-test/drive.sh gui` si no hay monitor).
+3. Crea y sube la etiqueta: `git tag -a v0.1.0-alpha.1 -m "…" && git push origin v0.1.0-alpha.1`.
+4. Cuando termine el workflow, completa las notas de la release (`gh release edit v0.1.0-alpha.1 --notes-file …`).
+
+El ejecutable se ejecuta desde una carpeta temporal y la CLI va dentro con `cli` delante (`packaging/pyinstaller/launcher.py`). `packaging/linux/install.sh` lo copia a `~/.local/bin` y crea la entrada del menú en `~/.local/share/applications`.
+
 ## Convenciones
 
 - Código, nombres y docstrings técnicos en inglés o español, pero de forma coherente dentro de cada módulo. Los textos de la interfaz y la documentación, en español.

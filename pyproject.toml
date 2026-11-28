@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pokemon-to-linux"
-version = "0.1.0.dev0"
+version = "0.1.0a1"
 description = "Lanzador y gestor de compatibilidad para ejecutar fangames de Pokémon (RPG Maker XP) en Linux."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -13,7 +13,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "Jose Pulido Diaz" }]
 keywords = ["pokemon", "fangame", "rpg-maker-xp", "wine", "mkxp-z", "linux", "r36s"]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Environment :: X11 Applications :: Qt",
     "Intended Audience :: End Users/Desktop",
     "Operating System :: POSIX :: Linux",
