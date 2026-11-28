@@ -1,7 +1,7 @@
 """Punto de entrada del ejecutable: la interfaz, o la CLI con «cli» delante.
 
-    pokemon-to-linux                 → interfaz gráfica
-    pokemon-to-linux cli check …     → igual que pokemon-to-linux-cli check …
+pokemon-to-linux                 → interfaz gráfica
+pokemon-to-linux cli check …     → igual que pokemon-to-linux-cli check …
 """
 
 import sys

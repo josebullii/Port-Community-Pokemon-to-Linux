@@ -35,7 +35,7 @@ Type=Application
 Name=Pokémon to Linux
 GenericName=Lanzador de fangames
 Comment=Ejecuta fangames de Pokémon para Windows (RPG Maker XP) con Wine
-Exec=$TARGET
+Exec="$TARGET"
 Icon=applications-games
 Terminal=false
 Categories=Game;
@@ -47,5 +47,5 @@ echo "Instalado en $TARGET"
 echo "Ábrelo desde el menú de aplicaciones («Pokémon to Linux») o con: pokemon-to-linux"
 case ":$PATH:" in
 *":$BIN_DIR:"*) ;;
-*) echo "Aviso: $BIN_DIR no está en tu PATH; desde la terminal usa la ruta completa." ;;
+*) echo "Aviso: $BIN_DIR aún no está en tu PATH (en Ubuntu se añade al volver a iniciar sesión)." ;;
 esac
